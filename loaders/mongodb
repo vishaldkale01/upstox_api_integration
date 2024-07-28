@@ -1,0 +1,16 @@
+dotenv.config();
+const uri = process.env.MONGO_DB
+// Connect to the MongoDB cluster
+const mongoConnect = async () => {
+  try {
+    console.log("trying to connect with mongo......." , uri);
+    await mongoose.connect(uri, { useNewUrlParser: true});
+    console.log('Connected successfully to MongoDB');
+  } catch (err) {
+    console.error('Failed to connect to MongoDB', err);
+    process.exit(1); // Exit process with failure code
+  }
+};
+
+// Export the connect function
+module.exports =   mongoConnect;
