@@ -1,3 +1,4 @@
+
 module.exports = () => {
   path = require("path");
   express = require("express");
@@ -8,7 +9,14 @@ module.exports = () => {
   axios = require("axios");
   access_token = "" ;
   refresh_token = "" ;
-  UpstoxClient = require('upstox-js-sdk')
+  UpstoxClient = require('upstox-js-sdk');
 
   // dotenv.config();
+  // common function
+  sendError  = require("../helper/responce").sendError ;
+  sendSuccess = require("../helper/responce").sendSuccess ;
+
+ 
 };
+
+
