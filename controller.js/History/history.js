@@ -39,7 +39,6 @@ apiInstance.getIntraDayCandleData(instrumentKey, interval, apiVersion, (error, d
       console.error(error);
       return sendError(res ,"getIntraDayCandleData" , JSON.parse(response.text) )
     } else {
-        console.log('API called successfully. Returned data: ' + JSON.stringify(data));
         sendSuccess(res , JSON.parse(response.text) )
     }
 });
