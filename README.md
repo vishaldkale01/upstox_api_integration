@@ -10,7 +10,7 @@ This project focuses on integrating all the APIs provided by the Upstox WebLink 
 
 To get started, clone this repository and install the dependencies:
 
-git clone https://github.com/your-username/upstox-api-integration.git
+git clone https://github.com/vishaldkale01/upstox-api-integration.git
 cd upstox-api-integration
 npm install
 
