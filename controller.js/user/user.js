@@ -22,7 +22,6 @@ const getUserProfile = async (req , res)=>{
 
 const getUserProfileFundAndMargine =  async (req , res)=>{
     try {
-        let defaultClient = UpstoxClient.ApiClient.instance;
         let OAUTH2 = defaultClient.authentications['OAUTH2'];
         OAUTH2.accessToken = access_token;
     
