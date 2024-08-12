@@ -4,8 +4,8 @@ const sendSuccess = (res, data) => {
   };
   
   // Common function for error response with function name
-  const sendError = (res, functionName, errorMessage, statusCode = 500) => {
-    const fullErrorMessage = `Error in ${functionName}: ${errorMessage}`;
+  const sendError = (res, functionName, errorMessage, errorStack = "" , statusCode = 500) => {
+    const fullErrorMessage = `Error in ${functionName}: ${errorMessage} , ${errorStack  } `;
     console.error(fullErrorMessage);
     res.status(statusCode).json({ status: 'error', message: errorMessage });
   };
