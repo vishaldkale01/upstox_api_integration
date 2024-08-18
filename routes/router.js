@@ -6,7 +6,7 @@ const { getUserProfile, getUserProfileFundAndMargine } = require('../controller.
 const getBrokerage = require('../controller.js/Charge/charges');
 const { HistoryCandleData, getIntraDayCandleData } = require('../controller.js/History/history');
 const marginDetails = require('../controller.js/MargineDetails/Margine');
-const { placeOrder, getOrderBook } = require('../controller.js/Order/order');
+const { placeOrder, getOrderBook, getOrderHistory, modifyOrder, historicalTrades } = require('../controller.js/Order/order');
 const { getHolding } = require('../controller.js/portfollio/portfollio');
 
 
@@ -22,6 +22,9 @@ router.post('/order/place', placeOrder);
 router.get('/order/retrieve-all', getOrderBook);
 // portfolio
 router.get('/portfolio/long-term-holdings', getHolding);
+router.put('/order/modify', modifyOrder);
+// trades
+router.get('/order/trades/get-trades-for-day', historicalTrades);
 
 
 module.exports = router;
