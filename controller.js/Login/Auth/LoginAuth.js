@@ -1,3 +1,4 @@
+const { Initializewebsoket } = require("../../webSocket/websocket_client");
 
 const getLoginUrl = (req, res) => {
     const url = `https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=${process.env.UPSTOX_API_KEY}&redirect_uri=${encodeURIComponent(process.env.UPSTOX_REDIRECT_URI)}&state=""`;
@@ -32,6 +33,7 @@ const getLoginUrl = (req, res) => {
             userType : data_.userType
           }
         }
+        Initializewebsoket(access_token)
         sendSuccess(res, new_data);
     })
     } catch (error) {
