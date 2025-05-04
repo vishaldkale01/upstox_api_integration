@@ -11,6 +11,7 @@ const mongoConnect = async () => {
     process.exit(1); // Exit process with failure code
   }
 };
+mongoConnect()
 
 // Export the connect function
-module.exports =   mongoConnect;
+// module.exports =   mongoConnect;

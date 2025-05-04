@@ -51,26 +51,13 @@ def analyze_sentiment(text, confidence_threshold=0.6):
 
 # Example
 news_text = """
-India’s retail credit market is experiencing a slowdown, with the latest TransUnion CIBIL Credit Market Indicator (CMI) report showing a decline in credit demand and supply.
-India’s retail credit market is experiencing a slowdown, with the latest TransUnion CIBIL Credit Market Indicator (CMI) showing a decline in credit demand and supply.
+US stocks fell sharply on Friday as Wall Street grappled with President Trump's escalating trade war and weighed signs of reinvigorated inflation pressures as consumer sentiment plummets.
 
-The CMI value for December 2024 stood at 101, down from 103 in the previous quarter, marking one of the slowest growth rates in recent years, according to the report.
+The Dow Jones Industrial Average (^DJI) gave up 1.6%, or over 700 points, while the benchmark S&P 500 (^GSPC) fell 2%. The Nasdaq Composite (^IXIC) dropped 2.7% as tech stocks led the declines.
 
-The slowdown has hit private banks the hardest, with their CMI value dropping to a three-year low of 92.
+The major averages sank after the release of a hotter-than-expected Personal Consumption Expenditures index reading, which includes the Federal Reserve's preferred inflation gauge of "core" PCE. The reading showed prices increased more than expected last month, rising 0.4% month over month and 2.8% year over year, continuing a stubborn plateau on the path to the Fed's 2% target.
 
-NBFCs, on the other hand, maintained a stronger position with a 22 percent year-on-year (YoY) growth and a CMI of 103.
-
-NTC customers hit
-
-The report highlighted a continued decline in consumption-driven lending, with a significant impact on new-to-credit (NTC) consumers.
-
-While public sector banks (PSUs) reported a 2 percent YoY growth in accounts disbursed, private sector banks saw a steep 23 percent decline.
-
-Despite the overall slowdown, personal loan credit performance stabilised for the first time since June 2023, suggesting a potential recovery in this segment.
-
-However, home loan and credit card originations continued to decline, according to the report.
-
-Borrowers from semi-urban and rural areas accounted for 51 percent of the demand, reflecting a 2 percent year-on-year growth, while younger consumers (below 25 years) maintained a stable share of 21 percent.
+Meanwhile, US consumer sentiment in March plummeted to its lowest level since November 2022. The latest reading from the University of Michigan came in at 57, down from a 64.7 reading in the prior month, as consumers fretted about inflation and broader economy, perhaps most notably in the labor market.
 """ 
 
 sentiment, probabilities = analyze_sentiment(news_text)

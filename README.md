@@ -1,30 +1,257 @@
 # Upstox API Integration in Node.js
 
-This project focuses on integrating all the APIs provided by the Upstox WebLink API into a Node.js application. The goal is to create a basic Node.js app that demonstrates how to interact with Upstox's trading, market data, and account management APIs.
+This project integrates the Upstox WebLink API into a Node.js application, providing a comprehensive trading platform with real-time market data, order management, and portfolio tracking capabilities.
 
 ## Table of Contents
+- [Features](#features)
 - [Installation](#installation)
 - [Setup](#setup)
+- [MongoDB Setup](#mongodb-setup)
+- [API Endpoints](#api-endpoints)
+- [WebSocket Integration](#websocket-integration)
+- [AI/ML Features](#aiml-features)
+- [Error Handling](#error-handling)
+
+## Features
+
+- **Authentication & Authorization**
+  - OAuth 2.0 integration with Upstox
+  - Secure token management
+  - Session handling
+
+- **Trading Operations**
+  - Place, modify, and cancel orders
+  - View order history and trade book
+  - Real-time order status updates
+  - Portfolio management
+
+- **Market Data**
+  - Real-time market quotes via WebSocket
+  - Historical candle data with pattern recognition
+  - OHLC data access
+  - Option chain data
+
+- **Account Management**
+  - User profile management
+  - Fund and margin details
+  - Holdings and positions tracking
+  - Brokerage calculation
+
+- **Advanced Features**
+  - Technical analysis with candlestick pattern recognition
+  - Real-time WebSocket market data feed
+  - Protobuf message encoding/decoding
+  - Sentiment analysis for market news (FinBERT integration)
 
 ## Installation
 
-To get started, clone this repository and install the dependencies:
-
+```bash
 git clone https://github.com/vishaldkale01/upstox-api-integration.git
 cd upstox-api-integration
 npm install
+```
 
-##  setup
-Create an Upstox Developer Account:
-Sign up on the Upstox Developer Platform to obtain your API key, secret, and other required credentials.
+## Setup
+
+1. Create an Upstox Developer Account and obtain API credentials
+2. Configure environment variables:
+
 ```bash
-Create a .env file in the root directory of the project and add your Upstox API credentials:
-UPSTOX_API_KEY
-UPSTOX_API_SECRET
-UPSTOX_REDIRECT_URI
-MONGO_DB
-port
+# .env file
+UPSTOX_API_KEY=your_api_key
+UPSTOX_API_SECRET=your_api_secret
+UPSTOX_REDIRECT_URI=your_redirect_uri
+MONGO_DB=your_mongodb_uri
+PORT=3000
+```
 
-After setting up your environment variables, you can start the server:
+3. Start the server:
+```bash
 npm start
+```
+
+## MongoDB Setup
+
+    ### Prerequisites
+- MongoDB server installed and running
+- MongoDB URI for connection
+- Mongoose ODM version 8.5.1 or higher
+
+### Configuration
+
+1. **Environment Variables**
+   Create or update your `.env` file with the MongoDB connection string:
+   ```
+   MONGO_DB=mongodb://localhost:27017/your_database_name
+   ```
+
+2. **Connection Options**
+   The application uses the following Mongoose connection options:
+   ```javascript
+   {
+     useNewUrlParser: true
+   }
+   ```
+
+### Implementation Details
+
+#### Connection Management
+The MongoDB connection is handled by the `mongoConnect` function in `loaders/mongodb`:
+- Automatic connection establishment on application startup
+- Connection string loaded from environment variables
+- Mongoose as the ODM (Object Document Mapper)
+- Synchronous connection with proper error handling
+
+#### Error Handling
+The application implements robust error handling for MongoDB:
+
+1. **Connection Errors**
+   - Failed connections are logged with detailed error messages
+   - Application exits with status code 1 on connection failure
+   - Error stack traces are preserved for debugging
+
+2. **Global Error Handlers**
+   - Unhandled Promise Rejections
+   - Uncaught Exceptions
+   - Type Errors during execution
+
+#### Logging and Monitoring
+The MongoDB connection includes comprehensive logging:
+
+- **Connection Attempts**: 
+  ```
+  "trying to connect with mongo......"
+  ```
+
+- **Success Messages**: 
+  ```
+  "Connected successfully to MongoDB"
+  ```
+
+- **Error Messages**:
+  ```
+  "Failed to connect to MongoDB" + detailed error information
+  ```
+
+### Integration with Express
+
+The MongoDB connection is established before the Express server starts listening for requests:
+
+1. Module loading and initialization
+2. MongoDB connection establishment
+3. Express server startup
+4. Port binding and listening
+
+This sequence ensures that the database is available before handling any API requests.
+
+### Best Practices
+
+1. **Environment Configuration**
+   - Keep MongoDB URI in environment variables
+   - Never commit credentials to version control
+   - Use different databases for development and production
+
+2. **Error Recovery**
+   - Application fails fast on connection errors
+   - Clear error messages for troubleshooting
+   - Proper cleanup on connection failures
+
+3. **Security**
+   - Use authentication for database access
+   - Configure proper database user permissions
+   - Enable SSL/TLS for production deployments
+
+### Troubleshooting
+
+If you encounter connection issues:
+
+1. Verify MongoDB is running:
+   ```bash
+   mongod --version
+   ```
+
+2. Check connection string format:
+   ```
+   mongodb://[username:password@]host[:port]/database
+   ```
+
+3. Ensure network connectivity:
+   - Check MongoDB port accessibility (default: 27017)
+   - Verify firewall settings
+   - Check network configuration
+
+4. Review application logs:
+   - Check for connection errors
+   - Verify environment variables
+   - Monitor MongoDB server logs
+
+## API Endpoints
+
+### Authentication
+- GET `/login` - Initiate Upstox login
+- GET `/callback` - OAuth callback handler
+
+### User & Account
+- GET `/user/profile` - Get user profile
+- GET `/user/get-funds-and-margin` - Get fund and margin details
+
+### Trading
+- POST `/order/place` - Place new order
+- PUT `/order/modify` - Modify existing order
+- GET `/order/retrieve-all` - Get order book
+- GET `/order/trades/get-trades-for-day` - Get day's trades
+
+### Market Data
+- GET `/historical-candle/:instrumentKey/:interval/:to_date/:from_date` - Get historical candles
+- GET `/historical-candle/intraday/:instrumentKey/:interval` - Get intraday data
+- GET `/charges/brokerage` - Calculate brokerage charges
+
+### Portfolio
+- GET `/portfolio/long-term-holdings` - Get holdings
+
+## WebSocket Integration
+
+The application includes real-time market data streaming via WebSocket:
+- Auto-reconnection handling
+- Protobuf message encoding/decoding
+- Support for multiple market data subscriptions
+- Real-time updates for various market data types
+
+## AI/ML Features
+
+### Market News Sentiment Analysis
+- Integration with FinBERT model
+- Real-time sentiment scoring
+- Support for custom confidence thresholds
+- Preprocessing pipeline for financial news
+
+## Error Handling
+
+The application implements comprehensive error handling:
+- Global error handlers for unhandled rejections and exceptions
+- Structured error responses
+- Detailed error logging
+- HTTP status code mapping
+
+## Development
+
+```bash
+# Run in development mode with nodemon
+npm run dev
+
+# Run tests
+npm test
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
+
+## License
+
+ISC
 
