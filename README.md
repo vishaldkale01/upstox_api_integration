@@ -11,6 +11,7 @@ This project integrates the Upstox WebLink API into a Node.js application, provi
 - [WebSocket Integration](#websocket-integration)
 - [AI/ML Features](#aiml-features)
 - [Error Handling](#error-handling)
+- [Future Plans](#future-plans)
 
 ## Features
 
@@ -239,6 +240,47 @@ The application implements comprehensive error handling:
 - Structured error responses
 - Detailed error logging
 - HTTP status code mapping
+
+## Future Plans
+
+### Virtual Trading Platform
+Our primary goal is to develop a sophisticated virtual trading platform where users can:
+- Trade on live market conditions using virtual currency
+- Practice trading strategies without financial risk
+- Experience real-time market conditions and order execution
+- Learn trading mechanics in a safe environment
+- Track virtual portfolio performance
+- Access historical performance analytics
+
+The virtual trading features will include:
+- Virtual wallet management with mock currency
+- Real-time profit/loss tracking
+- Risk-free trading experience
+- Paper trading with live market data
+- Performance analytics and reports
+- Trading strategy validation
+
+### Database Implementation
+The MongoDB configuration is reserved for future implementation, where we plan to:
+- Store user trading history
+- Save user preferences and configurations
+- Maintain portfolio tracking data
+- Record trading statistics and analytics
+
+### Redis Integration
+We plan to implement Redis for:
+- High-performance caching
+- Real-time market data caching
+- Session management
+- Rate limiting
+- Temporary data storage for improved performance
+
+These database implementations will enhance the platform's capabilities by providing:
+- Persistent data storage
+- Improved performance
+- Better user experience
+- Historical data analysis
+- Advanced trading features
 
 ## Development
 
