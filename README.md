@@ -72,7 +72,7 @@ npm start
 
 ## MongoDB Setup
 
-    ### Prerequisites
+### Prerequisites
 - MongoDB server installed and running
 - MongoDB URI for connection
 - Mongoose ODM version 8.5.1 or higher
@@ -96,11 +96,18 @@ npm start
 ### Implementation Details
 
 #### Connection Management
-The MongoDB connection is handled by the `mongoConnect` function in `loaders/mongodb`:
-- Automatic connection establishment on application startup
+The MongoDB connection is automatically established in `loaders/mongodb`:
+- Auto-executing connection function
 - Connection string loaded from environment variables
 - Mongoose as the ODM (Object Document Mapper)
 - Synchronous connection with proper error handling
+
+The connection is established as soon as the module is loaded, ensuring database availability before the application starts:
+
+```javascript
+// Connection is automatically established when the module loads
+mongoConnect();
+```
 
 #### Error Handling
 The application implements robust error handling for MongoDB:
@@ -135,9 +142,9 @@ The MongoDB connection includes comprehensive logging:
 
 ### Integration with Express
 
-The MongoDB connection is established before the Express server starts listening for requests:
+The MongoDB connection is automatically established when the application starts:
 
-1. Module loading and initialization
+1. Module loading triggers connection
 2. MongoDB connection establishment
 3. Express server startup
 4. Port binding and listening
