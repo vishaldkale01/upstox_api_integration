@@ -2,6 +2,8 @@
 
 This project integrates the Upstox WebLink API into a Node.js application, providing a comprehensive trading platform with real-time market data, order management, and portfolio tracking capabilities.
 
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+
 ## Table of Contents
 - [Features](#features)
 - [Installation](#installation)
@@ -12,6 +14,9 @@ This project integrates the Upstox WebLink API into a Node.js application, provi
 - [AI/ML Features](#aiml-features)
 - [Error Handling](#error-handling)
 - [Future Plans](#future-plans)
+- [Development](#development)
+- [License](#license)
+- [Contributing](#contributing)
 
 ## Features
 
@@ -82,7 +87,7 @@ npm start
 
 1. **Environment Variables**
    Create or update your `.env` file with the MongoDB connection string:
-   ```
+   ```bash
    MONGO_DB=mongodb://localhost:27017/your_database_name
    ```
 
@@ -127,17 +132,17 @@ The application implements robust error handling for MongoDB:
 The MongoDB connection includes comprehensive logging:
 
 - **Connection Attempts**: 
-  ```
+  ```bash
   "trying to connect with mongo......"
   ```
 
 - **Success Messages**: 
-  ```
+  ```bash
   "Connected successfully to MongoDB"
   ```
 
 - **Error Messages**:
-  ```
+  ```bash
   "Failed to connect to MongoDB" + detailed error information
   ```
 
@@ -179,7 +184,7 @@ If you encounter connection issues:
    ```
 
 2. Check connection string format:
-   ```
+   ```bash
    mongodb://[username:password@]host[:port]/database
    ```
 
@@ -292,6 +297,10 @@ npm run dev
 npm test
 ```
 
+## License
+
+This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
+
 ## Contributing
 
 1. Fork the repository
@@ -300,7 +309,4 @@ npm test
 4. Push to the branch
 5. Create a new Pull Request
 
-## License
-
-ISC
 
