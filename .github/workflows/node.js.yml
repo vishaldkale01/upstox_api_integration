@@ -2,9 +2,9 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 jobs:
   build:
@@ -23,14 +23,15 @@ jobs:
       UPSTOX_REDIRECT_URI: ${{ secrets.UPSTOX_REDIRECT_URI }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
 
-    - run: npm ci
+      - run: npm ci
 
-    - run: npm run start
+      - name: Run tests
+        run: npm test
