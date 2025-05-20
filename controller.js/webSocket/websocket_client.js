@@ -2,6 +2,7 @@
 var UpstoxClient = require("upstox-js-sdk");
 const WebSocket = require("ws").WebSocket;
 const protobuf = require("protobufjs");
+const analyzeTrend = require("../../services/anylyser/analyzeTrend");
 
 // Initialize global variables
 const Initializewebsoket = (access_token) => {
@@ -62,7 +63,9 @@ const connectWebSocket = async (wsUrl) => {
     });
 
     ws.on("message", (data) => {
-      console.log(JSON.stringify(decodeProfobuf(data))); // Decode the protobuf message on receiving it
+      const decodedData = decodeProfobuf(data);
+      // console.log(JSON.stringify(decodedData));
+      analyzeTrend(decodedData); // Add trend analysis for each message
     });
 
     ws.on("error", (error) => {
@@ -90,6 +93,9 @@ const decodeProfobuf = (buffer) => {
   );
   return FeedResponse.decode(buffer);
 };
+
+// Function to analyze market trend
+
 
 // Initialize the protobuf part and establish the WebSocket connection
 (async () => {
