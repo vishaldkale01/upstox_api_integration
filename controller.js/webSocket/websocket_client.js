@@ -45,7 +45,7 @@ const connectWebSocket = async (wsUrl) => {
       resolve(ws); // Resolve the promise once connected
 
       // Set a timeout to send a subscription message after 1 second
-      setTimeout(() => {
+      // setTimeout(() => {
         const data = {
           guid: "someguid",
           method: "sub",
@@ -55,7 +55,7 @@ const connectWebSocket = async (wsUrl) => {
           },
         };
         ws.send(Buffer.from(JSON.stringify(data)));
-      }, 1000);
+      // }, 1000);
     });
 
     ws.on("close", () => {
@@ -64,7 +64,7 @@ const connectWebSocket = async (wsUrl) => {
 
     ws.on("message", (data) => {
       const decodedData = decodeProfobuf(data);
-      // console.log(JSON.stringify(decodedData));
+      console.log(JSON.stringify(decodedData));
       analyzeTrend(decodedData); // Add trend analysis for each message
     });
 
