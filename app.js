@@ -16,6 +16,7 @@ process
     dotenv.config();
     console.log(access_token, "access_token");
     
-    app.listen(process.env.port || 3000 , ()=>{
-        console.log("Server Listen On port " ,process.env.port);
+    const port = process.env.PORT || process.env.port || 3000;
+    app.listen(port , ()=>{
+        console.log("Server Listen On port " , port);
     })

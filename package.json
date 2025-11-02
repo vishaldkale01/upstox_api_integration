@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-     "test": "echo 'Running tests...' && exit 0" 
+    "test": "mocha test/*.test.js --timeout 10000"
   },
   "keywords": [],
   "author": "",
@@ -22,5 +22,11 @@
     "upstox": "^2.0.0",
     "upstox-js-sdk": "^2.14.0",
     "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "chai": "^4.5.0",
+    "chai-http": "^4.4.0",
+    "mocha": "^10.8.2",
+    "nodemon": "^3.1.10"
   }
 }
