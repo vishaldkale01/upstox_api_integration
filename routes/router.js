@@ -1,13 +1,13 @@
 // upstoxRoutes.js
 const express = require('express');
 const router = express.Router();
-const { getLoginUrl, handleCallback } = require('../controller.js/Login/Auth/LoginAuth');
-const { getUserProfile, getUserProfileFundAndMargine } = require('../controller.js/user/user');
-const getBrokerage = require('../controller.js/Charge/charges');
-const { HistoryCandleData, getIntraDayCandleData } = require('../controller.js/History/history');
-const marginDetails = require('../controller.js/MargineDetails/Margine');
-const { placeOrder, getOrderBook, getOrderHistory, modifyOrder, historicalTrades } = require('../controller.js/Order/order');
-const { getHolding } = require('../controller.js/portfollio/portfollio');
+const { getLoginUrl, handleCallback } = require('../controllers/Login/Auth/LoginAuth');
+const { getUserProfile, getUserProfileFundAndMargine } = require('../controllers/user/user');
+const getBrokerage = require('../controllers/Charge/charges');
+const { HistoryCandleData, getIntraDayCandleData } = require('../controllers/History/history');
+const marginDetails = require('../controllers/MargineDetails/Margine');
+const { placeOrder, getOrderBook, getOrderHistory, modifyOrder, historicalTrades } = require('../controllers/Order/order');
+const { getHolding } = require('../controllers/portfollio/portfollio');
 
 
 router.get('/login', getLoginUrl);
