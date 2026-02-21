@@ -51,7 +51,7 @@ const data = {
     'grant_type': 'authorization_code',
   }
   const url = 'https://api.upstox.com/v2/login/authorization/token';
-const headers = {
+  const headers = {
     'accept': 'application/json',
     'Content-Type': 'application/x-www-form-urlencoded',
   };

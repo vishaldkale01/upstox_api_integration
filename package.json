@@ -20,7 +20,7 @@
     "morgan": "^1.10.0",
     "protobufjs": "^7.4.0",
     "upstox": "^2.0.0",
-    "upstox-js-sdk": "^2.14.0",
+    "upstox-js-sdk": "^2.21.0",
     "ws": "^8.18.1"
   }
 }
