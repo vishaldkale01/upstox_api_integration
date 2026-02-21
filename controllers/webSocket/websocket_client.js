@@ -2,6 +2,7 @@
 var UpstoxClient = require("upstox-js-sdk");
 const WebSocket = require("ws").WebSocket;
 const protobuf = require("protobufjs");
+const analyzeTrend = require("../../services/anylyser/analyzeTrend");
 
 const Initializewebsoket = (access_token) => {
   let protobufRoot = null;
@@ -123,4 +124,88 @@ const Initializewebsoket = (access_token) => {
   })();
 };
 
+<<<<<<< HEAD:controller.js/webSocket/websocket_client.js
 module.exports = { Initializewebsoket };
+=======
+// Function to establish WebSocket connection
+const connectWebSocket = async (wsUrl) => {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl, {
+      headers: {
+        "Api-Version": apiVersion,
+        Authorization: "Bearer " + OAUTH2.accessToken,
+      },
+      followRedirects: true,
+    });
+
+    // WebSocket event handlers
+    ws.on("open", () => {
+      console.log("connected socket connect successfully");
+      resolve(ws); // Resolve the promise once connected
+
+      // Set a timeout to send a subscription message after 1 second
+      // setTimeout(() => {
+        const data = {
+          guid: "someguid",
+          method: "sub",
+          data: {
+            mode: "full",
+            instrumentKeys: ["NSE_INDEX|Nifty Bank", "NSE_INDEX|Nifty 50"],
+          },
+        };
+        ws.send(Buffer.from(JSON.stringify(data)));
+      // }, 1000);
+    });
+
+    ws.on("close", () => {
+      console.log("disconnected");
+    });
+
+    ws.on("message", (data) => {
+      const decodedData = decodeProfobuf(data);
+      console.log(JSON.stringify(decodedData));
+      analyzeTrend(decodedData); // Add trend analysis for each message
+    });
+
+    ws.on("error", (error) => {
+      console.log("error:", error);
+      reject(error); // Reject the promise on error
+    });
+  });
+};
+
+// Function to initialize the protobuf part
+const initProtobuf = async () => {
+  protobufRoot = await protobuf.load(__dirname + "/MarketDataFeed.proto");
+  console.log("Protobuf part initialization complete");
+};
+
+// Function to decode protobuf message
+const decodeProfobuf = (buffer) => {
+  if (!protobufRoot) {
+    console.warn("Protobuf part not initialized yet!");
+    return null;
+  }
+
+  const FeedResponse = protobufRoot.lookupType(
+    "com.upstox.marketdatafeeder.rpc.proto.FeedResponse"
+  );
+  return FeedResponse.decode(buffer);
+};
+
+// Function to analyze market trend
+
+
+// Initialize the protobuf part and establish the WebSocket connection
+(async () => {
+  try {
+    await initProtobuf(); // Initialize protobuf
+    const wsUrl = await getMarketFeedUrl(); // Get the market feed URL
+    const ws = await connectWebSocket(wsUrl); // Connect to the WebSocket
+  } catch (error) {
+    console.error("An error occurred:", error);
+  }
+})();
+}
+module.exports = { Initializewebsoket };
+>>>>>>> 245dfac9c53128c4851914611d7550ba5c3ae290:controllers/webSocket/websocket_client.js

@@ -12,9 +12,8 @@ process
     require("./loaders/module")();
     require("./loaders/express")();
     access_token = "test"
-    const mongoConnect = require("./loaders/mongodb");
+    require("./loaders/mongodb");
     dotenv.config();
-    mongoConnect()
     console.log(access_token, "access_token");
     
     app.listen(process.env.port || 3000 , ()=>{
