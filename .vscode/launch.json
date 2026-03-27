@@ -1,0 +1,85 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Main App",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/app.js",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeExecutable": "node",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "outputCapture": "console"
+    },
+    {
+      "name": "Debug Trailing Stop Logic",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/services/anylyser/analyzeTrend.js",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeExecutable": "node",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "outputCapture": "console",
+      "stopOnEntry": false,
+      "args": []
+    },
+    {
+      "name": "Debug with MongoDB",
+      "type": "node", 
+      "request": "launch",
+      "program": "${workspaceFolder}/app.js",
+      "env": {
+        "NODE_ENV": "development",
+        "MONGO_DB": "mongodb://localhost:27017/upstox_trading_test"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeExecutable": "node",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "outputCapture": "console"
+    },
+    {
+      "name": "Attach to Process",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": false,
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": null,
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Debug Trading Analysis (Step Mode)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/debug/standalone-trail-debug.js",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeExecutable": "node",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "outputCapture": "console",
+      "stopOnEntry": true
+    }
+  ]
+}
