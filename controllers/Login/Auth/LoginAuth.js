@@ -34,8 +34,8 @@ const getLoginUrl = (req, res) => {
             userType : data_.userType,
             accessToken: access_token
           }
-          
-          Initializewebsoket(access_token)
+          // we connect and process the tick data in oythin so we comment this for now
+          // Initializewebsoket(access_token)
           
           // Redirect to trading dashboard with user data
           const params = new URLSearchParams(new_data).toString();

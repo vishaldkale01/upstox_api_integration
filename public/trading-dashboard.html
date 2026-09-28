@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .settings-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .settings-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 400;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-start:active {
+            transform: translateY(0);
+        }
+
+        .btn-stop {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-stop:active {
+            transform: translateY(0);
+        }
+
+        .btn-logout {
+            background: #e9ecef;
+            color: #333;
+            grid-column: 1 / -1;
+        }
+
+        .btn-logout:hover {
+            background: #dee2e6;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .status.loading {
+            background: #cfe2ff;
+            color: #084298;
+            border: 1px solid #b6d4fe;
+            display: block;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(8, 66, 152, 0.3);
+            border-radius: 50%;
+            border-top-color: #084298;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .trading-status {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .trading-status .badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .trading-status .badge.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .trading-status .badge.inactive {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .info-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .info-card .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .info-card .value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📈 Trading Dashboard</h1>
+            <p>Start or stop your automated trading session</p>
+        </div>
+
+        <div class="user-info">
+            <div class="info-row">
+                <span class="info-label">User ID:</span>
+                <span class="info-value" id="userId">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">User Name:</span>
+                <span class="info-value" id="userName">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value" id="userEmail">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">User Type:</span>
+                <span class="info-value" id="userType">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Trading Status:</span>
+                <span class="info-value" id="tradingStatus">
+                    <span class="badge inactive">Not Started</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Trading Settings</h3>
+
+            <div class="form-group">
+                <label for="capital">Capital (₹)</label>
+                <input type="number" id="capital" placeholder="Enter capital amount" value="50000" min="1000">
+            </div>
+
+            <div class="form-group">
+                <label for="tradeMode">Trade Mode</label>
+                <select id="tradeMode">
+                    <option value="VIRTUAL">Virtual Trading</option>
+                    <option value="LIVE">Live Trading</option>
+                </select>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="useAiValidation">
+                <label for="useAiValidation">Use AI Validation</label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="debugMode" checked>
+                <label for="debugMode">Debug Mode</label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="enableMarketDataRecorder" checked>
+                <label for="enableMarketDataRecorder">Enable Market Data Recorder</label>
+            </div>
+
+            <div class="form-group">
+                <label for="recorderOutputPath">Recorder Output Path</label>
+                <input type="text" id="recorderOutputPath" placeholder="e.g. data/market_data" value="data/market_data">
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="label">Connected Exchanges</div>
+                <div class="value" id="exchanges">-</div>
+            </div>
+            <div class="info-card">
+                <div class="label">Account Type</div>
+                <div class="value" id="accountType">-</div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="btn-start" onclick="startTrading()">▶ Start Trading</button>
+            <button class="btn-stop" onclick="stopTrading()">⏹ Stop Trading</button>
+            <button class="btn-logout" onclick="logout()">🚪 Logout</button>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="trading-status" id="tradingStatusSection" style="display: none;">
+            <p style="margin-bottom: 10px; color: #666;">Session Active</p>
+            <div id="sessionDetails" style="font-size: 12px; color: #999;"></div>
+        </div>
+    </div>
+
+    <script>
+        let userData = {};
+        let tradingActive = false;
+
+        // Load user data from URL params
+        function loadUserData() {
+            const params = new URLSearchParams(window.location.search);
+            userData = {
+                userId: params.get('userId') || 'DEV0',
+                userName: params.get('userName') || 'User',
+                email: params.get('email') || 'user@example.com',
+                userType: params.get('userType') || 'Individual',
+                exchanges: params.get('exchanges') || 'NSE',
+                accessToken: params.get('accessToken') || ''
+            };
+
+            // If no data from URL, try to get from sessionStorage
+            if (!userData.accessToken && sessionStorage.getItem('userSession')) {
+                userData = JSON.parse(sessionStorage.getItem('userSession'));
+            }
+
+            displayUserInfo();
+        }
+
+        function displayUserInfo() {
+            document.getElementById('userId').textContent = userData.userId || 'DEV0';
+            document.getElementById('userName').textContent = userData.userName || 'User';
+            document.getElementById('userEmail').textContent = userData.email || '-';
+            document.getElementById('userType').textContent = userData.userType || '-';
+            document.getElementById('exchanges').textContent = userData.exchanges || '-';
+            document.getElementById('accountType').textContent = userData.userType || 'Individual';
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = type === 'loading' ? `${message}` : message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        async function startTrading() {
+            if (tradingActive) {
+                showStatus('⚠️ Trading is already running!', 'error');
+                return;
+            }
+
+            const capital = document.getElementById('capital').value;
+            const tradeMode = document.getElementById('tradeMode').value;
+            const useAiValidation = document.getElementById('useAiValidation').checked;
+            const debugMode = document.getElementById('debugMode').checked;
+            const enableMarketDataRecorder = document.getElementById('enableMarketDataRecorder').checked;
+            const recorderOutputPath = document.getElementById('recorderOutputPath').value.trim() || 'data/market_data';
+
+            if (!capital || capital < 1000) {
+                showStatus('❌ Please enter a valid capital amount (minimum ₹1000)', 'error');
+                return;
+            }
+
+            if (!userData.accessToken && userData.userId === 'DEV0') {
+                showStatus('⚠️ Using demo mode with DEV0 user', 'loading');
+            } else {
+                showStatus('🔄 Starting trading...', 'loading');
+            }
+
+            try {
+                const response = await fetch('/start-trading', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userData.userId || 'DEV0',
+                        access_token: userData.accessToken || '',
+                        trade_mode: tradeMode,
+                        capital: parseInt(capital),
+                        USE_AI_VALIDATION: useAiValidation,
+                        DEBUG_MODE: debugMode,
+                        ENABLE_MARKET_DATA_RECORDER: enableMarketDataRecorder,
+                        RECORDER_OUTPUT_PATH: recorderOutputPath
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    tradingActive = true;
+                    updateTradingStatus('ACTIVE');
+                    showStatus(`✅ Trading started successfully! Capital: ₹${capital}`, 'success');
+                    disableSettingsWhileTrading(true);
+                    
+                    // Log to console for debugging
+                    console.log('Trading session started:', data);
+                } else {
+                    showStatus(`❌ Error: ${data.message || 'Failed to start trading'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus(`❌ Connection error: ${error.message}`, 'error');
+            }
+        }
+
+        async function stopTrading() {
+            if (!tradingActive) {
+                showStatus('⚠️ Trading is not running', 'error');
+                return;
+            }
+
+            showStatus('🛑 Stopping trading...', 'loading');
+
+            try {
+                const response = await fetch('/stop-trading', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userData.userId || 'DEV0',
+                        access_token: userData.accessToken || ''
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    tradingActive = false;
+                    updateTradingStatus('STOPPED');
+                    showStatus('✅ Trading stopped successfully', 'success');
+                    disableSettingsWhileTrading(false);
+                    
+                    // Log to console for debugging
+                    console.log('Trading session stopped:', data);
+                } else {
+                    showStatus(`❌ Error: ${data.message || 'Failed to stop trading'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus(`❌ Connection error: ${error.message}`, 'error');
+            }
+        }
+
+        function updateTradingStatus(status) {
+            const badge = document.querySelector('.info-row #tradingStatus .badge');
+            if (badge) {
+                badge.textContent = status;
+                badge.className = `badge ${status === 'ACTIVE' ? 'active' : 'inactive'}`;
+            }
+        }
+
+        function disableSettingsWhileTrading(disabled) {
+            document.getElementById('capital').disabled = disabled;
+            document.getElementById('tradeMode').disabled = disabled;
+            document.getElementById('useAiValidation').disabled = disabled;
+            document.getElementById('debugMode').disabled = disabled;
+            document.getElementById('enableMarketDataRecorder').disabled = disabled;
+            document.getElementById('recorderOutputPath').disabled = disabled;
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout? Any active trading will be stopped.')) {
+                if (tradingActive) {
+                    stopTrading().then(() => {
+                        window.location.href = '/login';
+                    });
+                } else {
+                    window.location.href = '/login';
+                }
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', loadUserData);
+    </script>
+</body>
+</html>

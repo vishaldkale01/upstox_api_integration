@@ -11,7 +11,6 @@ const startTrading = async (req, res) => {
     try {
         const requestData = req.body;
 
-        
 
         console.log(`[Trading] Proxying start-trading to Python backend:`, {
             url: `${PYTHON_BACKEND_URL}/start-trading`,
@@ -42,6 +41,8 @@ const startTrading = async (req, res) => {
             capital: requestData.capital,
             USE_AI_VALIDATION: requestData.USE_AI_VALIDATION,
             DEBUG_MODE: requestData.DEBUG_MODE,
+            ENABLE_MARKET_DATA_RECORDER: requestData.ENABLE_MARKET_DATA_RECORDER,
+            RECORDER_OUTPUT_PATH: requestData.RECORDER_OUTPUT_PATH,
             status: 'ACTIVE',
             startTime: new Date(),
             pythonBackendResponse: pythonResponse.data
