@@ -248,6 +248,26 @@ The application implements comprehensive error handling:
 
 ## Future Plans
 
+## Trading dashboard and paper analytics
+
+The dashboard at `/trading-dashboard.html` provides paper-session controls, signal history, trade history, and date-filtered analytics. Analytics are read-only and use aggregation queries against the `upstox_trading` MongoDB database; no browser request receives raw trade or signal documents.
+
+Available paper-history routes include:
+
+- `GET /paper-sessions?user_id=...` — session summaries and paper P&L.
+- `GET /paper-trades?user_id=...` — closed/open paper trades with linked signal context.
+- `GET /paper-signals?user_id=...` — stored signal decisions with date and setup filters.
+- `GET /paper-signals/:signal_id?user_id=...` — full signal details.
+- `GET /api/analytics?user_id=...&from=YYYY-MM-DD&to=YYYY-MM-DD` — aggregated net P&L, win rate, brokerage, exit reasons, entry hours, direction, strategy versions, and equity data. `/paper-analytics` remains available for compatibility.
+
+Analytics date ranges use IST boundaries. Paper mode remains the only dashboard execution mode; live trading is not enabled by this project.
+
+The browser smoke check can be run with:
+
+```bash
+node scripts/dashboard-browser-check.js
+```
+
 ### Virtual Trading Platform
 Our primary goal is to develop a sophisticated virtual trading platform where users can:
 - Trade on live market conditions using virtual currency
