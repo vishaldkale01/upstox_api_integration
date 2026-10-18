@@ -13,7 +13,8 @@ This project integrates the Upstox WebLink API into a Node.js application, provi
 - [WebSocket Integration](#websocket-integration)
 - [AI/ML Features](#aiml-features)
 - [Error Handling](#error-handling)
-- [Future Plans](#future-plans)
+- [Trading dashboard and paper analytics](#trading-dashboard-and-paper-analytics)
+- [Roadmap](#roadmap)
 - [Development](#development)
 - [License](#license)
 - [Contributing](#contributing)
@@ -246,8 +247,6 @@ The application implements comprehensive error handling:
 - Detailed error logging
 - HTTP status code mapping
 
-## Future Plans
-
 ## Trading dashboard and paper analytics
 
 The dashboard at `/trading-dashboard.html` provides paper-session controls, signal history, trade history, and date-filtered analytics. Analytics are read-only and use aggregation queries against the `upstox_trading` MongoDB database; no browser request receives raw trade or signal documents.
@@ -268,23 +267,6 @@ The browser smoke check can be run with:
 node scripts/dashboard-browser-check.js
 ```
 
-### Virtual Trading Platform
-Our primary goal is to develop a sophisticated virtual trading platform where users can:
-- Trade on live market conditions using virtual currency
-- Practice trading strategies without financial risk
-- Experience real-time market conditions and order execution
-- Learn trading mechanics in a safe environment
-- Track virtual portfolio performance
-- Access historical performance analytics
-
-The virtual trading features will include:
-- Virtual wallet management with mock currency
-- Real-time profit/loss tracking
-- Risk-free trading experience
-- Paper trading with live market data
-- Performance analytics and reports
-- Trading strategy validation
-
 ### Current persistence and market-data architecture
 
 MongoDB is currently used for persisted paper-trading history and analytics. The dashboard reads the `trades` and `signals` collections through aggregation-backed read-only routes. Paper trades, linked signals, session identifiers, strategy versions, costs, and net P&L are retained for history and reporting.
@@ -296,6 +278,12 @@ Redis is used by the Python execution service for real-time coordination and ris
 The Python service records market ticks and depth data to date-partitioned Parquet datasets under `data/market_data/`. These recordings support deterministic replay and backtesting through the existing replay/backtest scripts. Recording manifests track session identity, timestamps, completeness, and dropped-event information. Incomplete recordings must be excluded from primary performance reports.
 
 Parquet recordings are separate from MongoDB trade and signal persistence: MongoDB stores decisions and outcomes, while Parquet stores the historical market-data stream needed to reproduce them.
+
+## Roadmap
+
+- Broker-verified Live mode with explicit confirmation, order modification, partial-fill handling, and broker-side reconciliation.
+- Additional analytics visualizations and recording-validity integration from the Python service manifests.
+- Further paper-session observation and replay validation before any live execution work.
 
 ## Development
 
