@@ -1,0 +1,49 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "debug.console.fontSize": 12,
+    "debug.inlineValues": "on",
+    "files.associations": {
+      "*.js": "javascript"
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/package-lock.json": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.vscode-node-azure-pack",
+      "esbenp.prettier-vscode",
+      "mongodb.mongodb-vscode"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Debug Trailing Stop (Standalone)",
+        "type": "node",
+        "request": "launch",
+        "program": "${workspaceFolder}/debug/trail-stop-debug.js",
+        "console": "integratedTerminal",
+        "envFile": "${workspaceFolder}/.env.debug"
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Test Trailing Stop",
+        "type": "shell",
+        "command": "node debug/trail-stop-debug.js",
+        "group": "test"
+      }
+    ]
+  }
+}

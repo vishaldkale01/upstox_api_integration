@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-     "test": "echo 'Running tests...' && exit 0" 
+    "test": "echo 'Running tests...' && exit 0",
+    "debug-trail": "node debug/standalone-trail-debug.js",
+    "debug-trail-inspect": "node --inspect-brk debug/standalone-trail-debug.js"
   },
   "keywords": [],
   "author": "",
