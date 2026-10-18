@@ -285,27 +285,17 @@ The virtual trading features will include:
 - Performance analytics and reports
 - Trading strategy validation
 
-### Database Implementation
-The MongoDB configuration is reserved for future implementation, where we plan to:
-- Store user trading history
-- Save user preferences and configurations
-- Maintain portfolio tracking data
-- Record trading statistics and analytics
+### Current persistence and market-data architecture
 
-### Redis Integration
-We plan to implement Redis for:
-- High-performance caching
-- Real-time market data caching
-- Session management
-- Rate limiting
-- Temporary data storage for improved performance
+MongoDB is currently used for persisted paper-trading history and analytics. The dashboard reads the `trades` and `signals` collections through aggregation-backed read-only routes. Paper trades, linked signals, session identifiers, strategy versions, costs, and net P&L are retained for history and reporting.
 
-These database implementations will enhance the platform's capabilities by providing:
-- Persistent data storage
-- Improved performance
-- Better user experience
-- Historical data analysis
-- Advanced trading features
+Redis is used by the Python execution service for real-time coordination and risk-state support, including cached market/session state and short-lived risk locks. Redis is not used as the dashboard's historical source of truth; MongoDB remains the source for persisted paper history.
+
+### Parquet market-data recordings
+
+The Python service records market ticks and depth data to date-partitioned Parquet datasets under `data/market_data/`. These recordings support deterministic replay and backtesting through the existing replay/backtest scripts. Recording manifests track session identity, timestamps, completeness, and dropped-event information. Incomplete recordings must be excluded from primary performance reports.
+
+Parquet recordings are separate from MongoDB trade and signal persistence: MongoDB stores decisions and outcomes, while Parquet stores the historical market-data stream needed to reproduce them.
 
 ## Development
 
