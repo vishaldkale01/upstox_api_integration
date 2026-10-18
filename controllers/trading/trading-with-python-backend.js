@@ -14,7 +14,8 @@ const startTrading = async (req, res) => {
 
         console.log(`[Trading] Proxying start-trading to Python backend:`, {
             url: `${PYTHON_BACKEND_URL}/start-trading`,
-            data: requestData,
+            user_id: requestData.user_id,
+            trade_mode: requestData.trade_mode,
             timestamp: new Date().toISOString()
         });
 
@@ -83,11 +84,13 @@ const startTrading = async (req, res) => {
 // Stop trading session - Direct proxy to Python backend
 const stopTrading = async (req, res) => {
     try {
-        const requestData = req.body;
+        const requestData = req.body || {};
+        const userId = requestData.user_id || req.query?.user_id;
 
         console.log(`[Trading] Proxying stop-trading to Python backend:`, {
             url: `${PYTHON_BACKEND_URL}/stop-trading`,
             data: requestData,
+            params: userId ? { user_id: userId } : undefined,
             timestamp: new Date().toISOString()
         });
 
@@ -96,6 +99,7 @@ const stopTrading = async (req, res) => {
             `${PYTHON_BACKEND_URL}/stop-trading`,
             requestData,
             {
+                params: userId ? { user_id: userId } : undefined,
                 timeout: 30000 // 30 second timeout
             }
         );
@@ -146,7 +150,7 @@ const stopTrading = async (req, res) => {
 // Get trading session status - Check local tracking
 const getSessionStatus = async (req, res) => {
     try {
-        const { user_id } = req.query;
+        const user_id = req.params.user_id || req.query.user_id;
 
         if (!user_id) {
             return res.status(400).json({
@@ -155,29 +159,11 @@ const getSessionStatus = async (req, res) => {
             });
         }
 
-        if (!global.tradingSessions) {
-            global.tradingSessions = {};
-        }
-
-        let activeSession = null;
-        for (const [sessionId, session] of Object.entries(global.tradingSessions)) {
-            if (session.user_id === user_id && session.status === 'ACTIVE') {
-                activeSession = {
-                    sessionId,
-                    ...session,
-                    uptime: Math.round((Date.now() - session.startTime.getTime()) / 1000)
-                };
-                break;
-            }
-        }
-
-        res.status(200).json({
-            success: true,
-            data: activeSession || {
-                status: 'NO_ACTIVE_SESSION',
-                user_id
-            }
-        });
+        const pythonResponse = await axios.get(
+            `${PYTHON_BACKEND_URL}/trading-status/${encodeURIComponent(user_id)}`,
+            { timeout: 10000 }
+        );
+        return res.status(pythonResponse.status).json(pythonResponse.data);
 
     } catch (error) {
         console.error('[Trading] Error getting session status:', error);
@@ -185,6 +171,25 @@ const getSessionStatus = async (req, res) => {
             success: false,
             message: 'Error getting session status',
             error: error.message
+        });
+    }
+};
+
+// Describe only the controls supported and validated by the Python service.
+const getControlPanelConfig = async (_req, res) => {
+    try {
+        const pythonResponse = await axios.get(
+            `${PYTHON_BACKEND_URL}/control-panel/config`,
+            { timeout: 10000 }
+        );
+        return res.status(pythonResponse.status).json(pythonResponse.data);
+    } catch (error) {
+        if (error.response) {
+            return res.status(error.response.status).json(error.response.data);
+        }
+        return res.status(503).json({
+            success: false,
+            message: 'Cannot connect to Python trading backend'
         });
     }
 };
@@ -275,6 +280,7 @@ module.exports = {
     startTrading,
     stopTrading,
     getSessionStatus,
+    getControlPanelConfig,
     getUserSessions,
     getTradingDashboard
 };

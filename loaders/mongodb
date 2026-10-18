@@ -6,6 +6,11 @@ const mongoConnect = async () => {
     console.log("trying to connect with mongo......." , uri);
     await mongoose.connect(uri, { useNewUrlParser: true});
     console.log('Connected successfully to MongoDB');
+    await Promise.all([
+      mongoose.connection.db.collection('trades').createIndex({ status: 1, created_at: -1 }),
+      mongoose.connection.db.collection('trades').createIndex({ 'entry.signal_id': 1 }),
+      mongoose.connection.db.collection('signals').createIndex({ timestamp: -1 })
+    ]);
   } catch (err) {
     console.error('Failed to connect to MongoDB', err);
     process.exit(1); // Exit process with failure code
