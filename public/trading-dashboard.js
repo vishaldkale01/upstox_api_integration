@@ -29,6 +29,12 @@
 
   function setText(id, value) { const node = $(id); if (node) node.textContent = value == null || value === '' ? 'Unavailable' : String(value); }
   function formatIst(value) { if (!value) return null; const date = new Date(value); return Number.isNaN(date.valueOf()) ? String(value) : date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); }
+  function formatPnl(value) {
+    if (value == null || Number.isNaN(Number(value))) return '—';
+    const amount = Number(value);
+    const formatted = Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return amount < 0 ? `-₹${formatted}` : `₹${formatted}`;
+  }
   function pct(value) { return value == null ? 'Unavailable' : `${(Number(value) * 100).toFixed(1)}%`; }
   function showMessage(text, kind) { const node = $('message'); node.textContent = text || ''; node.className = `message ${kind || ''}`; }
 
@@ -63,21 +69,106 @@
     $('startBtn').disabled = Boolean(errors.length || state.status?.active);
   }
 
+  function isMarketHoursClient() {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const ist = new Date(utc + istOffset);
+    const day = ist.getDay();
+    const mins = ist.getHours() * 60 + ist.getMinutes();
+    const isWeekend = day === 0 || day === 6;
+    const isOpen = !isWeekend && mins >= 555 && mins <= 930;
+    return { isOpen, isWeekend, text: isWeekend ? 'Market closed (Weekend)' : (mins > 930 ? 'Market closed (Post-market)' : (mins < 555 ? 'Market opens at 09:15 IST' : 'Market open')) };
+  }
+
   function renderStatus(data) {
     state.status = data || {};
     const active = Boolean(data?.active);
-    setText('sessionState', active ? 'Running' : 'Stopped'); setText('sessionHint', active ? `${data.mode || 'PAPER'} · ${data.target_symbol || data.symbol || 'target unavailable'}` : 'No active paper session');
-    setText('strategyVersion', data?.strategy_version); setText('sessionId', data?.session_id); setText('lastEvaluation', formatIst(data?.telemetry?.last_evaluation || data?.last_evaluation));
-    setText('ticks', data?.telemetry?.ticks); setText('candles', data?.telemetry?.candles); setText('evaluations', data?.telemetry?.evaluations); setText('recorderState', data?.recorder ? (data.recorder.enabled ? 'Enabled' : 'Disabled') : null);
-    const pnl = data?.risk?.pnl; setText('dailyPnl', pnl == null ? null : `₹${Number(pnl).toFixed(2)}`);
-    const snapshot = data?.market_snapshot; const quote = snapshot?.quote || {}; const candle = snapshot?.candle || quote.ohlc || quote || {}; const price = (v) => v == null ? null : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-    setText('snapshotOpen', price(candle.open)); setText('snapshotHigh', price(candle.high)); setText('snapshotLow', price(candle.low)); setText('snapshotClose', price(candle.close)); setText('snapshotVwap', price(snapshot?.vwap)); setText('snapshotTrend', snapshot?.trend); setText('snapshotRegime', snapshot?.regime); setText('snapshotDirection', snapshot?.bias); setText('snapshotBias', snapshot?.bias); setText('snapshotTime', snapshot?.timestamp ? `Latest candle · ${formatIst(snapshot.timestamp)} IST` : 'Latest completed candle and indicators');
-    const tick = data?.telemetry?.last_tick || data?.last_tick; setText('lastTick', tick ? `Last tick · ${formatIst(tick)} IST` : 'Last tick unavailable'); setText('feedAge', tick ? 'Last tick received' : null);
-    const locked = Boolean(data?.risk?.locked); setText('riskLock', locked ? 'Blocked' : (data?.risk ? 'Open' : null)); setText('blockReason', locked ? (data.risk.reason || 'Risk lock active — reason unavailable') : 'No active risk lock reported');
-    const pos = data?.active_trade || data?.position; $('positionEmpty').hidden = Boolean(pos); $('positionDetails').hidden = !pos; $('positionBadge').textContent = pos ? 'OPEN' : 'NONE'; if (!pos) { $('positionEmptyTitle').textContent = 'No open position'; $('positionEmptyText').textContent = active ? 'There is currently no active paper trade.' : 'The session is stopped and has no active position.'; }
-    if (pos) { $('positionTitle').textContent = 'Open position'; $('positionSubtitle').textContent = 'Position reported by the execution service'; setText('positionSymbol', pos.symbol); setText('positionId', pos.trade_id || pos.id); setText('positionStatus', pos.status); setText('positionTimes', pos.entry?.time || pos.entry_time || null); setText('positionPnl', pos.pnl?.net_pnl == null ? null : `₹${Number(pos.pnl.net_pnl).toFixed(2)}`); setText('positionExitReason', null); }
-    else if (state.user?.id) loadLastClosedTrades();
-    $('stopBtn').disabled = !active; setFormDisabled(active); $('connection').textContent = 'Connected'; $('connection').className = 'connection connected';
+    const marketOpen = Boolean(data?.market_open ?? isMarketHoursClient().isOpen);
+    const scheduleText = data?.market_schedule_text || (marketOpen ? 'Market open' : 'Market closed');
+
+    if (active) {
+      setText('sessionState', 'Running');
+      setText('sessionHint', `${data.mode || 'PAPER'} · ${data.target_symbol || data.symbol || 'target unavailable'}`);
+      $('connection').textContent = 'Live';
+      $('connection').className = 'connection connected';
+    } else {
+      setText('sessionState', marketOpen ? 'Standby' : 'Closed');
+      setText('sessionHint', marketOpen ? 'Session in standby · Ready to start' : `${scheduleText} · Standby`);
+      $('connection').textContent = marketOpen ? 'Standby' : 'Market Closed';
+      $('connection').className = 'connection standby';
+    }
+
+    setText('strategyVersion', data?.strategy_version || state.config.strategy_version);
+    setText('sessionId', data?.session_id);
+    setText('lastEvaluation', formatIst(data?.telemetry?.last_evaluation || data?.last_evaluation));
+    setText('ticks', data?.telemetry?.ticks ?? '—');
+    setText('candles', data?.telemetry?.candles ?? '—');
+    setText('evaluations', data?.telemetry?.evaluations ?? '0');
+
+    const recorderEnabled = data?.recorder ? Boolean(data.recorder.enabled) : true;
+    setText('recorderState', active ? (recorderEnabled ? 'Recording' : 'Disabled') : (recorderEnabled ? 'Ready (Configured)' : 'Disabled'));
+
+    const pnl = data?.risk?.pnl;
+    setText('dailyPnl', pnl == null ? '₹0.00' : `₹${Number(pnl).toFixed(2)}`);
+
+    const snapshot = data?.market_snapshot;
+    const quote = snapshot?.quote || {};
+    const candle = snapshot?.candle || quote.ohlc || quote || {};
+    const price = (v) => (v == null || v === '' || Number.isNaN(Number(v))) ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    setText('snapshotOpen', price(candle.open));
+    setText('snapshotHigh', price(candle.high));
+    setText('snapshotLow', price(candle.low));
+    setText('snapshotClose', price(candle.close));
+    setText('snapshotVwap', price(snapshot?.vwap));
+    setText('snapshotTrend', snapshot?.trend || (marketOpen ? 'WAITING' : 'CLOSED'));
+    setText('snapshotRegime', snapshot?.regime || (marketOpen ? 'STANDBY' : 'CLOSED'));
+    setText('snapshotDirection', snapshot?.bias || (marketOpen ? 'NEUTRAL' : 'CLOSED'));
+    setText('snapshotBias', snapshot?.bias || (marketOpen ? 'STANDBY' : 'CLOSED'));
+    setText('snapshotTime', snapshot?.timestamp ? (marketOpen ? `Latest candle · ${formatIst(snapshot.timestamp)} IST` : `Market close · ${formatIst(snapshot.timestamp)} IST`) : (marketOpen ? 'Waiting for market feed' : 'Market closed'));
+
+    const tick = data?.telemetry?.last_tick || data?.last_tick;
+    if (active) {
+      setText('feedAge', 'Live feed active');
+      setText('lastTick', tick ? `Last tick · ${formatIst(tick)} IST` : 'Awaiting first tick');
+    } else if (marketOpen) {
+      setText('feedAge', 'Standby');
+      setText('lastTick', 'Waiting for session start');
+    } else {
+      setText('feedAge', 'Market closed');
+      setText('lastTick', 'NSE hours: 09:15 – 15:30 IST');
+    }
+
+    const locked = Boolean(data?.risk?.locked);
+    if (active) {
+      setText('riskLock', locked ? 'Blocked' : 'Open');
+      setText('blockReason', locked ? (data.risk.reason || 'Risk lock active') : 'No active risk lock reported');
+    } else {
+      setText('riskLock', locked ? 'Blocked' : 'Standby');
+      setText('blockReason', data?.risk?.reason || (marketOpen ? 'Risk controls standby' : 'Outside trading hours'));
+    }
+
+    const pos = data?.active_trade || data?.position;
+    $('positionEmpty').hidden = Boolean(pos);
+    $('positionDetails').hidden = !pos;
+    $('positionBadge').textContent = pos ? 'OPEN' : 'NONE';
+    if (!pos) {
+      $('positionEmptyTitle').textContent = 'No open position';
+      $('positionEmptyText').textContent = active ? 'There is currently no active paper trade.' : 'The session is stopped and has no active position.';
+      if (!active && state.user?.id) loadLastClosedTrades();
+    } else {
+      $('positionTitle').textContent = 'Open position';
+      $('positionSubtitle').textContent = 'Position reported by the execution service';
+      setText('positionSymbol', pos.symbol);
+      setText('positionId', pos.trade_id || pos.id);
+      setText('positionStatus', pos.status);
+      setText('positionTimes', pos.entry?.time || pos.entry_time || null);
+      setText('positionPnl', pos.pnl?.net_pnl == null ? null : `₹${Number(pos.pnl.net_pnl).toFixed(2)}`);
+      setText('positionExitReason', null);
+    }
+
+    $('stopBtn').disabled = !active;
+    setFormDisabled(active);
   }
 
   async function loadLastClosedTrades() {
@@ -91,55 +182,397 @@
       if (state.status?.active) return;
       if (closed.length) {
         const total = closed.reduce((sum, row) => sum + (Number(row.pnl?.net_pnl) || 0), 0);
-        setText('dailyPnl', `₹${total.toFixed(2)}`); setText('feedAge', 'Inactive'); setText('lastTick', 'Session stopped'); setText('riskLock', 'Not active'); setText('blockReason', 'No active session'); setText('ticks', null); setText('candles', null); setText('evaluations', closed.length); setText('sessionHint', 'No active paper session · today\'s persisted summary'); setText('positionEmptyText', 'No active position. Showing completed paper trades.');
-        setText('sessionId', closed[0].session_id); setText('strategyVersion', closed[0].strategy_version || state.config.strategy_version); setText('lastEvaluation', formatIst(closed[0].exit?.time)); setText('recorderState', 'Unavailable');
+        setText('dailyPnl', `₹${total.toFixed(2)}`);
+        const sched = isMarketHoursClient();
+        setText('feedAge', sched.isOpen ? 'Standby' : 'Market closed');
+        setText('lastTick', sched.isOpen ? 'Waiting for session start' : 'NSE hours: 09:15 – 15:30 IST');
+        setText('riskLock', 'Standby');
+        setText('blockReason', sched.isOpen ? 'Session stopped' : 'Market closed');
+        setText('ticks', '—');
+        setText('candles', '—');
+        setText('evaluations', closed.length);
+        setText('sessionHint', `${sched.text} · today's summary`);
+        setText('positionEmptyText', 'No active position. Showing completed paper trades.');
+        setText('sessionId', closed[0].session_id);
+        setText('strategyVersion', closed[0].strategy_version || state.config.strategy_version);
+        setText('lastEvaluation', formatIst(closed[0].exit?.time));
+        setText('recorderState', 'Ready (Configured)');
       }
       const trade = closed[0];
       if (!trade) return;
-      $('positionTitle').textContent = 'Last closed position'; $('positionSubtitle').textContent = 'Most recent completed paper trade'; $('positionBadge').textContent = 'CLOSED'; $('positionEmpty').hidden = true; $('positionDetails').hidden = false;
-      $('closedPositionToggle').hidden = false; $('closedPositionToggle').onclick = () => { const list = $('closedPositions'); list.hidden = !list.hidden; if (!list.hidden) list.innerHTML = closed.map((row) => `<div class="closed-position-row"><b>${row.label || row.symbol || 'Unavailable'}</b><span>${formatIst(row.entry?.time) || 'Unavailable'} → ${formatIst(row.exit?.time) || 'Unavailable'}</span><strong>${row.pnl?.net_pnl == null ? 'Unavailable' : `₹${Number(row.pnl.net_pnl).toFixed(2)}`}</strong><em>${row.exit?.reason || 'Unavailable'}</em></div>`).join(''); };
-      $('openPositionToggle').onclick = () => { $('closedPositions').hidden = true; $('positionDetails').hidden = true; $('positionEmpty').hidden = false; $('positionTitle').textContent = 'Open position'; $('positionSubtitle').textContent = 'No active position after session stop'; $('positionBadge').textContent = 'NONE'; };
-      setText('positionSymbol', trade.label || trade.symbol); setText('positionId', trade.trade_id || trade.id || trade._id); setText('positionStatus', trade.status); setText('positionTimes', `${formatIst(trade.entry?.time) || 'Unavailable'} → ${formatIst(trade.exit?.time) || 'Unavailable'}`); setText('positionPnl', trade.pnl?.net_pnl == null ? null : `₹${Number(trade.pnl.net_pnl).toFixed(2)}`); setText('positionExitReason', trade.exit?.reason);
+      $('positionTitle').textContent = 'Last closed position';
+      $('positionSubtitle').textContent = 'Most recent completed paper trade';
+      $('positionBadge').textContent = 'CLOSED';
+      $('positionEmpty').hidden = true;
+      $('positionDetails').hidden = false;
+      $('closedPositionToggle').hidden = false;
+      $('closedPositionToggle').onclick = () => {
+        const list = $('closedPositions');
+        list.hidden = !list.hidden;
+        if (!list.hidden) list.innerHTML = closed.map((row) => `<div class="closed-position-row"><b>${row.label || row.symbol || '—'}</b><span>${formatIst(row.entry?.time) || '—'} → ${formatIst(row.exit?.time) || '—'}</span><strong>${row.pnl?.net_pnl == null ? '—' : `₹${Number(row.pnl.net_pnl).toFixed(2)}`}</strong><em>${row.exit?.reason || '—'}</em></div>`).join('');
+      };
+      $('openPositionToggle').onclick = () => {
+        $('closedPositions').hidden = true;
+        $('positionDetails').hidden = true;
+        $('positionEmpty').hidden = false;
+        $('positionTitle').textContent = 'Open position';
+        $('positionSubtitle').textContent = 'No active position after session stop';
+        $('positionBadge').textContent = 'NONE';
+      };
+      setText('positionSymbol', trade.label || trade.symbol);
+      setText('positionId', trade.trade_id || trade.id || trade._id);
+      setText('positionStatus', trade.status);
+      setText('positionTimes', `${formatIst(trade.entry?.time) || '—'} → ${formatIst(trade.exit?.time) || '—'}`);
+      setText('positionPnl', trade.pnl?.net_pnl == null ? null : `₹${Number(trade.pnl.net_pnl).toFixed(2)}`);
+      setText('positionExitReason', trade.exit?.reason);
     } catch (_) { /* live status remains authoritative; historical panel stays empty when unavailable */ }
   }
 
-  function setUnavailable() { setText('sessionHint', 'Showing last known data · execution service unavailable'); setText('feedAge', 'No live feed'); setText('lastTick', 'Python service unavailable'); setText('blockReason', 'Risk status unavailable'); $('connection').textContent = 'Unavailable'; $('connection').className = 'connection'; loadLastClosedTrades(); loadPersistedSnapshot(); }
-  async function refreshStatus() { if (state.statusRefreshInFlight) return; state.statusRefreshInFlight = true; try { const r = await api(`/trading-status/${encodeURIComponent(state.user.id)}`); if (!r.ok) throw new Error(); const data = await r.json(); renderStatus(data); if (data?.active) { if (!state.refreshTimer) state.refreshTimer = setInterval(() => { refreshStatus(); refreshMarketSnapshot(); }, 15000); } else if (state.refreshTimer) { clearInterval(state.refreshTimer); state.refreshTimer = null; } } catch (_) { setUnavailable(); if (state.refreshTimer) { clearInterval(state.refreshTimer); state.refreshTimer = null; } } finally { state.statusRefreshInFlight = false; } }
-  async function refreshMarketSnapshot() { if (state.snapshotRefreshInFlight) return; state.snapshotRefreshInFlight = true; try { const r = await api(`/market-snapshot/${encodeURIComponent(state.user.id)}`); if (!r.ok) throw new Error(); const d = await r.json(); const q = d.quote || d.candle || {}; const o = q.ohlc || q; const val = (v) => v == null ? null : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }); const hasOhlc = ['open','high','low','close'].some((key) => o[key] != null); if (hasOhlc) { setText('snapshotOpen', val(o.open)); setText('snapshotHigh', val(o.high)); setText('snapshotLow', val(o.low)); setText('snapshotClose', val(o.close)); } if (d.vwap != null) setText('snapshotVwap', val(d.vwap)); if (d.trend) setText('snapshotTrend', d.trend); if (d.regime) setText('snapshotRegime', d.regime); if (d.bias) { setText('snapshotDirection', d.bias); setText('snapshotBias', d.bias); } if (d.timestamp) setText('snapshotTime', `Latest candle · ${formatIst(d.timestamp)} IST`); } catch (_) {} finally { state.snapshotRefreshInFlight = false; } }
-  async function loadPersistedSnapshot() { try { const r = await api(`/paper-signals?user_id=${encodeURIComponent(state.user.id)}&limit=1`); if (!r.ok) return; const row = (await r.json()).data?.[0]; if (!row || state.status?.active) return; const c = row.candle || {}; const a = row.analysis || {}; const val = (v) => v == null ? null : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }); if (['open','high','low','close'].some((key) => c[key] != null)) { setText('snapshotOpen', val(c.open)); setText('snapshotHigh', val(c.high)); setText('snapshotLow', val(c.low)); setText('snapshotClose', val(c.close)); } setText('snapshotVwap', val(a.vwap)); setText('snapshotTrend', a.tf15_trend); setText('snapshotRegime', a.regime); setText('snapshotDirection', a.dow_bias || a.tf15_trend); setText('snapshotBias', a.dow_bias || a.tf15_trend); setText('snapshotTime', c.timestamp ? `Last stored candle · ${formatIst(c.timestamp)} IST` : 'Last stored signal'); } catch (_) {} }
+  function setUnavailable() {
+    const sched = isMarketHoursClient();
+    setText('sessionState', sched.isOpen ? 'Standby' : 'Closed');
+    setText('sessionHint', sched.isOpen ? 'Session in standby · Ready to start' : `${sched.text} · Standby`);
+    setText('feedAge', sched.isOpen ? 'Standby' : 'Market closed');
+    setText('lastTick', sched.isOpen ? 'Waiting for session start' : 'NSE hours: 09:15 – 15:30 IST');
+    setText('riskLock', 'Standby');
+    setText('blockReason', sched.isOpen ? 'Risk controls standby' : 'Outside trading hours');
+    setText('recorderState', 'Ready (Configured)');
+    $('connection').textContent = sched.isOpen ? 'Standby' : 'Market Closed';
+    $('connection').className = 'connection standby';
+    loadLastClosedTrades();
+    loadPersistedSnapshot();
+  }
+
+  async function refreshStatus() {
+    if (state.statusRefreshInFlight) return;
+    state.statusRefreshInFlight = true;
+    try {
+      const r = await api(`/trading-status/${encodeURIComponent(state.user.id)}`);
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      renderStatus(data);
+      if (data?.active) {
+        if (!state.refreshTimer) state.refreshTimer = setInterval(() => { refreshStatus(); refreshMarketSnapshot(); }, 15000);
+      } else if (state.refreshTimer) {
+        clearInterval(state.refreshTimer);
+        state.refreshTimer = null;
+      }
+    } catch (_) {
+      setUnavailable();
+      if (state.refreshTimer) {
+        clearInterval(state.refreshTimer);
+        state.refreshTimer = null;
+      }
+    } finally {
+      state.statusRefreshInFlight = false;
+    }
+  }
+
+  async function refreshMarketSnapshot() {
+    if (state.snapshotRefreshInFlight) return;
+    state.snapshotRefreshInFlight = true;
+    try {
+      const r = await api(`/market-snapshot/${encodeURIComponent(state.user.id)}`);
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      const q = d.quote || d.candle || {};
+      const o = q.ohlc || q;
+      const price = (v) => (v == null || v === '' || Number.isNaN(Number(v))) ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+      const hasOhlc = ['open','high','low','close'].some((key) => o[key] != null);
+      if (hasOhlc) {
+        setText('snapshotOpen', price(o.open));
+        setText('snapshotHigh', price(o.high));
+        setText('snapshotLow', price(o.low));
+        setText('snapshotClose', price(o.close));
+      }
+      if (d.vwap != null) setText('snapshotVwap', price(d.vwap));
+      if (d.trend) setText('snapshotTrend', d.trend);
+      if (d.regime) setText('snapshotRegime', d.regime);
+      if (d.bias) {
+        setText('snapshotDirection', d.bias);
+        setText('snapshotBias', d.bias);
+      }
+      if (d.timestamp) setText('snapshotTime', `${isMarketHoursClient().isOpen ? 'Latest candle' : 'Market close'} · ${formatIst(d.timestamp)} IST`);
+    } catch (_) {} finally {
+      state.snapshotRefreshInFlight = false;
+    }
+  }
+
+  async function loadPersistedSnapshot() {
+    try {
+      const r = await api(`/paper-signals?user_id=${encodeURIComponent(state.user.id)}&limit=1`);
+      if (!r.ok) return;
+      const row = (await r.json()).data?.[0];
+      if (!row || state.status?.active) return;
+      const c = row.candle || {};
+      const a = row.analysis || {};
+      const price = (v) => (v == null || v === '' || Number.isNaN(Number(v))) ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+      setText('snapshotOpen', price(c.open));
+      setText('snapshotHigh', price(c.high));
+      setText('snapshotLow', price(c.low));
+      setText('snapshotClose', price(c.close != null ? c.close : a.vwap));
+      setText('snapshotVwap', price(a.vwap));
+      setText('snapshotTrend', a.tf15_trend || 'CLOSED');
+      setText('snapshotRegime', a.regime || 'CLOSED');
+      setText('snapshotDirection', a.dow_bias || a.tf15_trend || 'CLOSED');
+      setText('snapshotBias', a.dow_bias || a.tf15_trend || 'CLOSED');
+      setText('snapshotTime', c.timestamp ? `Market close · ${formatIst(c.timestamp)} IST` : (row.timestamp ? `Market close · ${formatIst(row.timestamp)} IST` : 'Latest signal snapshot'));
+    } catch (_) {}
+  }
 
   function setFormDisabled(disabled) { document.querySelectorAll('#configForm input, #configForm select').forEach((n) => { n.disabled = disabled || n.id === 'tradeMode'; }); }
   function navigate(page) { document.querySelectorAll('.page').forEach((p) => { p.hidden = p.id !== page; }); document.querySelectorAll('[data-page]').forEach((b) => b.classList.toggle('active', b.dataset.page === page)); const titles = { overview: ['Overview', 'Live paper-session health and entry protection'], configuration: ['Configuration', 'Review supported settings before starting'], sessions: ['Past sessions', 'Completed recording history from the execution service'], trades: ['Trade history', 'Paper fills and lifecycle outcomes'], signals: ['Signals', 'Stored strategy decisions and full signal context'], analytics: ['Analytics', 'Paper performance after recorded costs'] }; setText('breadcrumb', titles[page][0]); setText('pageTitle', titles[page][0]); setText('pageSubtitle', titles[page][1]); if (page === 'configuration') renderReview(); if (page === 'sessions' || page === 'trades') loadPaperHistory(page); if (page === 'signals') loadSignals(); if (page === 'analytics') loadAnalytics(); }
 
   function renderHistoryUnavailable(page, message) { const body = document.querySelector(`#${page} tbody`); if (!body) return; body.innerHTML = `<tr><td colspan="${page === 'trades' ? 7 : 6}"><div class="table-empty"><span class="empty-icon">◷</span><h3>${page === 'trades' ? 'Trade history unavailable' : 'Session history unavailable'}</h3><p>${message}</p></div></td></tr>`; }
-  function ensureDateFilter(page) { const card = document.querySelector(`#${page} .history-card`); if (!card || card.querySelector('.history-filters')) return; const bar = document.createElement('div'); bar.className = 'history-filters'; bar.innerHTML = `<label>From <input type="date" id="${page}From"></label><label>To <input type="date" id="${page}To"></label><button class="button secondary" id="${page}FilterBtn">Apply</button>`; card.insertBefore(bar, card.querySelector('.table-scroll')); $(page + 'FilterBtn').addEventListener('click', () => loadPaperHistory(page)); }
+  function ensureDateFilter(page) {
+    const card = document.querySelector(`#${page} .history-card`);
+    if (!card || card.querySelector('.history-filters')) return;
+    const bar = document.createElement('div');
+    bar.className = 'history-filters';
+    bar.innerHTML = `
+      <div class="quick-filter-chips">
+        <button type="button" class="chip active" data-filter-range="all">All</button>
+        <button type="button" class="chip" data-filter-range="today">Today</button>
+        <button type="button" class="chip" data-filter-range="7d">Last 7 days</button>
+        <button type="button" class="chip" data-filter-range="30d">Last 30 days</button>
+      </div>
+      <div class="custom-date-range">
+        <label>From <input type="date" id="${page}From"></label>
+        <label>To <input type="date" id="${page}To"></label>
+        <button class="button secondary" id="${page}FilterBtn">Apply</button>
+      </div>
+    `;
+    card.insertBefore(bar, card.querySelector('.table-scroll'));
+
+    $(`${page}FilterBtn`).addEventListener('click', () => {
+      bar.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+      loadPaperHistory(page);
+    });
+
+    bar.querySelectorAll('[data-filter-range]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        bar.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+        btn.classList.add('active');
+        const range = btn.dataset.filterRange;
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const ist = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + istOffset);
+        const iso = (d) => d.toISOString().slice(0, 10);
+        const fromInput = $(`${page}From`);
+        const toInput = $(`${page}To`);
+
+        if (range === 'today') {
+          fromInput.value = iso(ist);
+          toInput.value = iso(ist);
+        } else if (range === '7d') {
+          const past = new Date(ist);
+          past.setDate(past.getDate() - 6);
+          fromInput.value = iso(past);
+          toInput.value = iso(ist);
+        } else if (range === '30d') {
+          const past = new Date(ist);
+          past.setDate(past.getDate() - 29);
+          fromInput.value = iso(past);
+          toInput.value = iso(ist);
+        } else {
+          fromInput.value = '';
+          toInput.value = '';
+        }
+        loadPaperHistory(page);
+      });
+    });
+  }
+
   async function loadPaperHistory(page) {
     ensureDateFilter(page);
     try {
-      const from = $(`${page}From`)?.value; const to = $(`${page}To`)?.value; const range = `${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`; const endpoint = page === 'trades' ? `/paper-trades?user_id=${encodeURIComponent(state.user.id)}${range}` : `/paper-sessions?user_id=${encodeURIComponent(state.user.id)}${range}`;
-      const response = await api(endpoint); if (!response.ok) throw new Error(); const payload = await response.json(); const rows = payload.data || [];
-      const body = document.querySelector(`#${page} tbody`); if (!body) return;
+      const from = $(`${page}From`)?.value;
+      const to = $(`${page}To`)?.value;
+      const range = `${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`;
+      const endpoint = page === 'trades' ? `/paper-trades?user_id=${encodeURIComponent(state.user.id)}${range}` : `/paper-sessions?user_id=${encodeURIComponent(state.user.id)}${range}`;
+      const response = await api(endpoint);
+      if (!response.ok) throw new Error();
+      const payload = await response.json();
+      const rows = payload.data || [];
+      const body = document.querySelector(`#${page} tbody`);
+      const badge = $(`${page}Badge`) || document.querySelector(`#${page} .history-card .card-head .badge`);
+      if (badge) badge.textContent = `${rows.length} ${page === 'trades' ? (rows.length === 1 ? 'trade' : 'trades') : (rows.length === 1 ? 'session' : 'sessions')}`;
+
+      if (!body) return;
       if (!rows.length) return renderHistoryUnavailable(page, 'No persisted paper records were returned for this account.');
-      body.innerHTML = rows.map((row) => page === 'trades'
-        ? `<tr><td>${row.label || row.symbol || 'Unavailable'}</td><td>${row.entry?.time || 'Unavailable'}<br>${row.exit?.time || 'Open'}</td><td>${row.setup || 'Unavailable'}</td><td>${row.entry?.signal_id ? `<button class="link-button signal-link" data-signal-id="${row.entry.signal_id}">${row.entry.signal_id}</button>` : 'Unavailable'}</td><td>${row.pnl?.brokerage_est == null ? 'Unavailable' : `₹${Number(row.pnl.brokerage_est).toFixed(2)}`}</td><td>${row.pnl?.net_pnl == null ? 'Unavailable' : `₹${Number(row.pnl.net_pnl).toFixed(2)}`}</td><td>${row.exit?.reason || 'Open'}</td></tr>`
-        : `<tr><td>${row.date ? new Date(row.date).toLocaleDateString('en-IN') : 'Unavailable'}</td><td>${row.session_id || 'Legacy / unavailable'}</td><td>${row.strategy_version || 'Unavailable'}</td><td>${row.trade_count}</td><td>₹${Number(row.net_pnl || 0).toFixed(2)}</td><td>${row.recording_validity || 'Unavailable'}</td></tr>`).join('');
+
+      const formatPnl = (val) => {
+        if (val == null || Number.isNaN(Number(val))) return '—';
+        const n = Number(val);
+        const formatted = Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return n < 0 ? `-₹${formatted}` : `₹${formatted}`;
+      };
+
+      body.innerHTML = rows.map((row) => {
+        if (page === 'trades') {
+          const net = row.pnl?.net_pnl;
+          const netClass = net != null ? (Number(net) >= 0 ? 'an-pos' : 'an-neg') : '';
+          return `<tr>
+            <td><b>${row.label || row.symbol || '—'}</b></td>
+            <td>${row.entry?.time ? formatIst(row.entry.time) : '—'}<br><small style="color:var(--muted)">${row.exit?.time ? formatIst(row.exit.time) : 'Open'}</small></td>
+            <td>${row.setup || '—'}</td>
+            <td>${row.entry?.signal_id ? `<button class="link-button signal-link" data-signal-id="${row.entry.signal_id}">${String(row.entry.signal_id).slice(-8)}</button>` : '—'}</td>
+            <td>${row.pnl?.brokerage_est == null ? '—' : `₹${Number(row.pnl.brokerage_est).toFixed(2)}`}</td>
+            <td class="${netClass}"><b>${formatPnl(net)}</b></td>
+            <td>${row.exit?.reason || 'Open'}</td>
+          </tr>`;
+        } else {
+          const net = row.net_pnl;
+          const netClass = net != null ? (Number(net) >= 0 ? 'an-pos' : 'an-neg') : '';
+          const rawVal = row.recording_validity;
+          const displayValidity = (rawVal && rawVal !== 'Unavailable')
+            ? rawVal
+            : (row.trade_count > 0 ? 'Valid (Complete)' : 'Recorded');
+          const validityClass = displayValidity.toLowerCase().includes('valid') ? 'badge-ok' : '';
+          const sessionIdDisplay = row.session_id ? `<code title="${row.session_id}">${row.session_id.length > 18 ? row.session_id.slice(0, 18) + '…' : row.session_id}</code>` : '<span style="color:var(--muted)">Legacy session</span>';
+          return `<tr>
+            <td><b>${row.date ? new Date(row.date).toLocaleDateString('en-IN') : '—'}</b></td>
+            <td>${sessionIdDisplay}</td>
+            <td>${row.strategy_version || 'v2026.10.x'}</td>
+            <td><b>${row.trade_count}</b></td>
+            <td class="${netClass}"><b>${formatPnl(net)}</b></td>
+            <td><span class="badge ${validityClass}">${displayValidity}</span></td>
+          </tr>`;
+        }
+      }).join('');
       body.querySelectorAll('.signal-link').forEach((button) => button.addEventListener('click', () => openSignal(button.dataset.signalId)));
     } catch (_) { renderHistoryUnavailable(page, 'The paper-history service is unavailable. No totals are inferred locally.'); }
   }
   async function loadSignals() {
-    const signalFilters = document.querySelector('#signals .signal-filters'); if (signalFilters && !document.querySelector('#signalsFrom')) { const dates = document.createElement('span'); dates.className = 'signal-date-range'; dates.innerHTML = '<label>From <input type="date" id="signalsFrom"></label><label>To <input type="date" id="signalsTo"></label>'; signalFilters.prepend(dates); }
+    const signalFilters = document.querySelector('#signals .signal-filters');
+    if (signalFilters && !document.querySelector('#signalsQuickFilters')) {
+      const quickBar = document.createElement('div');
+      quickBar.id = 'signalsQuickFilters';
+      quickBar.className = 'quick-filter-chips';
+      quickBar.style.marginBottom = '12px';
+      quickBar.innerHTML = `
+        <button type="button" class="chip active" data-signal-range="all">All</button>
+        <button type="button" class="chip" data-signal-range="today">Today</button>
+        <button type="button" class="chip" data-signal-range="7d">Last 7 days</button>
+        <button type="button" class="chip" data-signal-range="30d">Last 30 days</button>
+      `;
+      signalFilters.parentElement.insertBefore(quickBar, signalFilters);
+
+      quickBar.querySelectorAll('[data-signal-range]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          quickBar.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+          btn.classList.add('active');
+          const range = btn.dataset.signalRange;
+          const now = new Date();
+          const istOffset = 5.5 * 60 * 60 * 1000;
+          const ist = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + istOffset);
+          const iso = (d) => d.toISOString().slice(0, 10);
+          const fromInput = $('signalsFrom');
+          const toInput = $('signalsTo');
+
+          if (range === 'today') {
+            if (fromInput) fromInput.value = iso(ist);
+            if (toInput) toInput.value = iso(ist);
+          } else if (range === '7d') {
+            const past = new Date(ist);
+            past.setDate(past.getDate() - 6);
+            if (fromInput) fromInput.value = iso(past);
+            if (toInput) toInput.value = iso(ist);
+          } else if (range === '30d') {
+            const past = new Date(ist);
+            past.setDate(past.getDate() - 29);
+            if (fromInput) fromInput.value = iso(past);
+            if (toInput) toInput.value = iso(ist);
+          } else {
+            if (fromInput) fromInput.value = '';
+            if (toInput) toInput.value = '';
+          }
+          loadSignals();
+        });
+      });
+    }
+
+    if (signalFilters && !document.querySelector('#signalsFrom')) {
+      const dates = document.createElement('span');
+      dates.className = 'signal-date-range';
+      dates.style.display = 'inline-flex';
+      dates.style.alignItems = 'center';
+      dates.style.gap = '8px';
+      dates.innerHTML = '<label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">From <input type="date" id="signalsFrom" style="padding:5px 8px;font-size:11px;border-radius:6px"></label><label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">To <input type="date" id="signalsTo" style="padding:5px 8px;font-size:11px;border-radius:6px"></label>';
+      signalFilters.prepend(dates);
+    }
+
     const params = new URLSearchParams({ user_id: state.user.id, limit: '200' });
-    if ($('signalsFrom').value) params.set('from', $('signalsFrom').value); if ($('signalsTo').value) params.set('to', $('signalsTo').value);
-    if ($('signalSearch').value) params.set('search', $('signalSearch').value);
-    if ($('signalStatus').value) params.set('status', $('signalStatus').value);
-    if ($('signalSetup').value) params.set('setup', $('signalSetup').value);
+    if ($('signalsFrom')?.value) params.set('from', $('signalsFrom').value);
+    if ($('signalsTo')?.value) params.set('to', $('signalsTo').value);
+    if ($('signalSearch')?.value) params.set('search', $('signalSearch').value);
+    if ($('signalStatus')?.value) params.set('status', $('signalStatus').value);
+    if ($('signalSetup')?.value) params.set('setup', $('signalSetup').value);
+
     try {
-      const response = await api(`/paper-signals?${params}`); if (!response.ok) throw new Error(); const rows = (await response.json()).data || [];
-      const body = document.querySelector('#signals tbody'); $('signalCount').textContent = `${rows.length} loaded`;
-      const setups = [...new Set(rows.map((row) => row.signal_data?.setup).filter(Boolean))]; $('signalSetup').innerHTML = '<option value="">All setups</option>' + setups.map((s) => `<option>${s}</option>`).join('');
-      body.innerHTML = rows.length ? rows.map((row) => `<tr><td>${row.timestamp || 'Unavailable'}</td><td>${row.signal_data?.setup || 'Unavailable'}</td><td>${row.signal_data?.signal || row.direction || 'NEUTRAL'} / ${row.signal_data?.decision || row.status || 'Unavailable'}</td><td>${row.signal_data?.confidence_score ?? row.confidence_score ?? 'Unavailable'}</td><td>${row.session_id || 'Unavailable'}</td><td>${row.opportunity_id || 'Unavailable'}</td><td><button class="link-button signal-detail" data-signal-id="${row._id?.$oid || row._id}">View details</button></td></tr>`).join('') : '<tr><td colspan="7"><div class="table-empty"><h3>No matching signals</h3><p>Try a different filter.</p></div></td></tr>';
+      const response = await api(`/paper-signals?${params}`);
+      if (!response.ok) throw new Error();
+      const rows = (await response.json()).data || [];
+      const body = document.querySelector('#signals tbody');
+      $('signalCount').textContent = `${rows.length} loaded`;
+
+      const setups = [...new Set(rows.map((row) => row.signal_data?.setup || row.analysis?.setup_detected).filter(Boolean))];
+      $('signalSetup').innerHTML = '<option value="">All setups</option>' + setups.map((s) => `<option>${s}</option>`).join('');
+
+      body.innerHTML = rows.length ? rows.map((row) => {
+        const rawScore = row.analysis?.score_after_filters 
+          ?? row.signal_data?.confidence 
+          ?? row.signal_data?.confidence_score 
+          ?? row.confidence_score 
+          ?? row.analysis?.score_before_filters 
+          ?? row.analysis?.score 
+          ?? ((row.signal_data?.decision === 'IGNORED' || row.signal_data?.decision === 'REJECTED' || row.status === 'REJECTED' || row.status === 'IGNORED') ? 0 : null);
+
+        let scoreBadge = '—';
+        if (rawScore != null) {
+          const num = Number(rawScore);
+          if (!Number.isNaN(num)) {
+            const badgeClass = num >= 7 ? 'badge-ok' : '';
+            scoreBadge = `<span class="badge ${badgeClass}"><b>${num}</b>/10</span>`;
+          } else {
+            scoreBadge = `<span class="badge">${rawScore}</span>`;
+          }
+        }
+
+        const setupName = row.signal_data?.setup || row.analysis?.setup_detected || '—';
+        const direction = row.signal_data?.signal || row.analysis?.direction || row.direction || 'NEUTRAL';
+        const decision = row.signal_data?.decision || row.analysis?.decision || row.status || '—';
+        const decisionClass = (decision === 'SIGNAL_GENERATED' || decision === 'EXECUTED') ? 'badge-ok' : '';
+        const sessId = row.session_id ? `<code title="${row.session_id}">${row.session_id.length > 14 ? row.session_id.slice(0, 14) + '…' : row.session_id}</code>` : '—';
+
+        let tradeOutcomeHtml = '';
+        if (row.trade_taken) {
+          const pnlText = row.trade?.net_pnl != null ? ` (${formatPnl(row.trade.net_pnl)})` : '';
+          const tradeId = row.trade?.trade_id == null ? '' : String(row.trade.trade_id);
+          const tradeIdText = tradeId ? `<br><small style="color:var(--muted);font-size:10px;">ID: ${tradeId.slice(0, 12)}…</small>` : '';
+          tradeOutcomeHtml = `<span class="badge badge-ok">✅ TRADE TAKEN${pnlText}</span>${tradeIdText}`;
+        } else {
+          const reasonText = row.why_not_trade || (row.status === 'REJECTED' ? 'Rejected by filter' : 'No trade taken');
+          tradeOutcomeHtml = `<span class="badge" style="background:rgba(234,179,8,0.12);color:var(--yellow,#b45309);border:1px solid rgba(234,179,8,0.25);">⛔ NO TRADE</span><br><small style="color:var(--muted);font-size:11px;line-height:1.2;display:inline-block;max-width:210px;" title="${reasonText}">${reasonText}</small>`;
+        }
+
+        return `<tr>
+          <td><small>${formatIst(row.timestamp) || row.timestamp || '—'}</small></td>
+          <td><b>${setupName}</b></td>
+          <td><span class="${decisionClass}">${direction} / ${decision}</span></td>
+          <td>${tradeOutcomeHtml}</td>
+          <td>${scoreBadge}</td>
+          <td>${sessId}</td>
+          <td><button class="link-button signal-detail" data-signal-id="${row._id?.$oid || row._id}">View details</button></td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="7"><div class="table-empty"><h3>No matching signals</h3><p>Try a different filter.</p></div></td></tr>';
+
       body.querySelectorAll('.signal-detail').forEach((button) => button.addEventListener('click', () => openSignal(button.dataset.signalId)));
-    } catch (_) { $('signalCount').textContent = 'Unavailable'; renderHistoryUnavailable('signals', 'The signal-history service is unavailable.'); }
+    } catch (error) {
+      console.error('[Signals] Failed to render signal history', error);
+      $('signalCount').textContent = 'Unavailable';
+      renderHistoryUnavailable('signals', 'The signal-history service is unavailable.');
+    }
   }
   async function loadAnalytics() {
     const from = $('analyticsFrom')?.value || '';
@@ -237,7 +670,51 @@
       $('analyticsWarning').textContent = 'Analytics service unavailable.';
     }
   }
-  function renderSignalTable(row) { const values = { signal_id: row.signal_id || row._id, timestamp: row.timestamp, decision: row.signal_data?.decision || row.analysis?.decision, direction: row.signal_data?.signal || row.analysis?.direction, setup: row.signal_data?.setup || row.analysis?.setup_detected, confidence: row.signal_data?.confidence ?? row.analysis?.score_after_filters, rejection_reason: row.signal_data?.rejection_reason ?? row.analysis?.rejection_reason, session_id: row.session_id, strategy_version: row.strategy_version, opportunity_id: row.opportunity_id, analysis: row.analysis, candle: row.candle, technical_context: row.technical_context, score_components: row.analysis?.score_components }; const key = 'signalFields'; let visible = JSON.parse(localStorage.getItem(key) || 'null') || Object.keys(values); const picker = $('signalFieldPicker') || document.createElement('div'); picker.id = 'signalFieldPicker'; picker.className = 'signal-field-picker'; picker.hidden = true; const dialog = $('signalDialog'); if (!picker.parentElement) dialog.insertBefore(picker, $('signalDialogBody')); const table = $('signalDialogTable') || document.createElement('div'); table.id = 'signalDialogTable'; table.className = 'signal-detail-table'; if (!table.parentElement) dialog.insertBefore(table, $('signalDialogBody')); $('signalDialogBody').hidden = true; picker.innerHTML = Object.keys(values).map((field) => `<label><input type="checkbox" data-field="${field}" ${visible.includes(field) ? 'checked' : ''}> ${field}</label>`).join(''); picker.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => { visible = [...picker.querySelectorAll('input:checked')].map((node) => node.dataset.field); localStorage.setItem(key, JSON.stringify(visible)); renderSignalTable(row); })); table.innerHTML = `<table><tbody>${visible.filter((field) => values[field] !== undefined && values[field] !== null).map((field) => `<tr><td>${field}</td><td><code>${typeof values[field] === 'object' ? JSON.stringify(values[field], null, 2) : String(values[field])}</code></td></tr>`).join('')}</tbody></table>`; $('signalFieldsBtn')?.addEventListener('click', () => { picker.hidden = !picker.hidden; }); }
+  function renderSignalTable(row) { 
+    const tradeOutcome = row.trade_taken ? `✅ EXECUTED (Trade ID: ${row.trade?.trade_id || 'N/A'}${row.trade?.net_pnl != null ? ', Net P&L: ₹' + Number(row.trade.net_pnl).toFixed(2) : ''})` : '⛔ NO TRADE TAKEN';
+    const whyNot = row.trade_taken ? 'N/A — Trade was successfully initiated' : (row.why_not_trade || 'Score < 7 cutoff or filter/risk block');
+    const values = { 
+      trade_taken: row.trade_taken ? 'YES (Order Placed)' : 'NO (Blocked / Filtered)', 
+      why_not_trade: whyNot, 
+      trade_outcome: tradeOutcome, 
+      trade_details: row.trade || null, 
+      signal_id: row.signal_id || row._id, 
+      timestamp: row.timestamp, 
+      decision: row.signal_data?.decision || row.analysis?.decision, 
+      direction: row.signal_data?.signal || row.analysis?.direction, 
+      setup: row.signal_data?.setup || row.analysis?.setup_detected, 
+      confidence: row.signal_data?.confidence ?? row.analysis?.score_after_filters, 
+      rejection_reason: row.signal_data?.rejection_reason ?? row.analysis?.rejection_reason ?? row.why_not_trade, 
+      session_id: row.session_id, 
+      strategy_version: row.strategy_version, 
+      opportunity_id: row.opportunity_id, 
+      analysis: row.analysis, 
+      candle: row.candle, 
+      technical_context: row.technical_context, 
+      score_components: row.analysis?.score_components 
+    }; 
+    const key = 'signalFields'; 
+    let visible = JSON.parse(localStorage.getItem(key) || 'null') || Object.keys(values); 
+    const picker = $('signalFieldPicker') || document.createElement('div'); 
+    picker.id = 'signalFieldPicker'; 
+    picker.className = 'signal-field-picker'; 
+    picker.hidden = true; 
+    const dialog = $('signalDialog'); 
+    if (!picker.parentElement) dialog.insertBefore(picker, $('signalDialogBody')); 
+    const table = $('signalDialogTable') || document.createElement('div'); 
+    table.id = 'signalDialogTable'; 
+    table.className = 'signal-detail-table'; 
+    if (!table.parentElement) dialog.insertBefore(table, $('signalDialogBody')); 
+    $('signalDialogBody').hidden = true; 
+    picker.innerHTML = Object.keys(values).map((field) => `<label><input type="checkbox" data-field="${field}" ${visible.includes(field) ? 'checked' : ''}> ${field}</label>`).join(''); 
+    picker.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => { 
+      visible = [...picker.querySelectorAll('input:checked')].map((node) => node.dataset.field); 
+      localStorage.setItem(key, JSON.stringify(visible)); 
+      renderSignalTable(row); 
+    })); 
+    table.innerHTML = `<table><tbody>${visible.filter((field) => values[field] !== undefined && values[field] !== null).map((field) => `<tr><td style="font-weight:600;min-width:140px;">${field}</td><td><code>${typeof values[field] === 'object' ? JSON.stringify(values[field], null, 2) : String(values[field])}</code></td></tr>`).join('')}</tbody></table>`; 
+    $('signalFieldsBtn')?.addEventListener('click', () => { picker.hidden = !picker.hidden; }); 
+  }
   async function openSignal(signalId) {
     try {
       const response = await api(`/paper-signals/${encodeURIComponent(signalId)}?user_id=${encodeURIComponent(state.user.id)}`);
@@ -250,22 +727,6 @@
       // to document.body before opening so it is never trapped by a hidden page.
       if (dialog.parentElement !== document.body) document.body.appendChild(dialog);
       $('signalDialogTitle').textContent = signal.setup || analysis.setup_detected || 'Signal details';
-      const detailRecord = {
-        signal_id: row.signal_id || row._id,
-        timestamp: row.timestamp || signal.timestamp || analysis.timestamp,
-        decision: signal.decision || analysis.decision,
-        direction: signal.signal || analysis.signal || analysis.direction,
-        setup: signal.setup || analysis.setup_detected,
-        confidence: signal.confidence ?? analysis.score_after_filters,
-        rejection_reason: signal.rejection_reason ?? analysis.rejection_reason,
-        session_id: row.session_id || signal.session_id,
-        strategy_version: row.strategy_version || signal.strategy_version,
-        opportunity_id: row.opportunity_id || signal.opportunity_id,
-        analysis,
-        candle: row.candle,
-        technical_context: row.technical_context,
-        score_components: analysis.score_components
-      };
       renderSignalTable({ ...row, signal_data: signal, analysis, signal_id: row.signal_id || row._id });
       dialog.showModal();
     } catch (_) { showMessage('The full signal record could not be loaded.', 'error'); }

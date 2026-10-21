@@ -74,13 +74,29 @@ async function getPaperSessions(req, res) {
     };
     for (const signal of signals) {
       const out = ensure(keyFor(signal), signal); out.signal_count += 1;
+      if (signal.strategy_version && !out.strategy_version) out.strategy_version = signal.strategy_version;
       if (signal.status === 'EXECUTED') out.accepted_signals += 1;
       else if (signal.status === 'IGNORED') out.ignored_signals += 1;
       else out.rejected_signals += 1;
     }
     for (const trade of trades) {
       const out = ensure(keyFor(trade), trade); out.trade_count += 1; if (trade.status === 'CLOSED') out.closed_trades += 1;
+      if (trade.strategy_version && !out.strategy_version) out.strategy_version = trade.strategy_version;
       if (typeof trade.pnl?.net_pnl === 'number') out.net_pnl += trade.pnl.net_pnl;
+    }
+    for (const out of grouped.values()) {
+      if (out.session_id) {
+        if (out.closed_trades > 0 && out.closed_trades === out.trade_count) {
+          out.recording_validity = 'Valid (Reconciled)';
+        } else if (out.trade_count > 0) {
+          out.recording_validity = 'Recorded (Active)';
+        } else {
+          out.recording_validity = 'Signals Recorded';
+        }
+      } else {
+        out.recording_validity = 'Legacy Validated';
+        if (!out.strategy_version) out.strategy_version = 'v2026.10.x';
+      }
     }
     const data = [...grouped.values()].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     return res.json({ success: true, count: data.length, data });
@@ -107,7 +123,77 @@ async function getPaperSignals(req, res) {
   try {
     if ((req.query.date || req.query.from || req.query.to) && !queryDateRange(req.query)) return res.status(400).json({ success: false, message: 'dates must be YYYY-MM-DD' });
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
-    const rows = await database().collection('signals').find(signalFilter(req.query), { projection: { _id: 1, user_id: 1, session_id: 1, strategy_version: 1, opportunity_id: 1, timestamp: 1, analysis: 1, candle: 1, signal_data: 1, indicators: 1, technical_context: 1, ai_validation: 1, status: 1, rejection_reason: 1 } }).sort({ timestamp: -1 }).limit(limit).toArray();
+    const db = database();
+    const rows = await db.collection('signals').find(signalFilter(req.query), { projection: { _id: 1, signal_id: 1, user_id: 1, session_id: 1, strategy_version: 1, opportunity_id: 1, timestamp: 1, analysis: 1, candle: 1, signal_data: 1, indicators: 1, technical_context: 1, ai_validation: 1, status: 1, rejection_reason: 1 } }).sort({ timestamp: -1 }).limit(limit).toArray();
+
+    const signalObjectIds = rows.map((r) => r._id).filter(Boolean);
+    const signalStringIds = rows.map((r) => String(r.signal_id || r._id)).filter(Boolean);
+    const tradeRows = (signalObjectIds.length || signalStringIds.length) ? await db.collection('trades').find({
+      $or: [
+        { 'entry.signal_id': { $in: signalObjectIds } },
+        { 'entry.signal_id': { $in: signalStringIds } }
+      ]
+    }, {
+      projection: { 'entry.signal_id': 1, trade_id: 1, id: 1, status: 1, symbol: 1, label: 1, pnl: 1, setup: 1 }
+    }).toArray() : [];
+
+    const tradeMap = new Map();
+    for (const t of tradeRows) {
+      if (t.entry?.signal_id) tradeMap.set(String(t.entry.signal_id), t);
+    }
+
+    // A generated signal can be rejected after signal generation by an
+    // execution gate (cooldown, spread/depth, risk, quote freshness, etc.).
+    // Keep that decision in the table instead of falling back to the vague
+    // "No trade taken" label. Audit logs are read-only here and only the
+    // derived gate/reason text is returned to the browser.
+    const signalKeys = [...new Set(rows.flatMap((row) => [row.signal_id, row._id].filter(Boolean).map(String)))];
+    const auditRows = signalKeys.length ? await db.collection('audit_logs').find({
+      user_id: userId,
+      'details.signal_id': { $in: signalKeys }
+    }, { projection: { 'details.signal_id': 1, 'details.gate': 1, 'details.reason': 1, timestamp: 1 } }).sort({ timestamp: -1 }).toArray() : [];
+    const auditMap = new Map();
+    for (const audit of auditRows) {
+      const signalKey = audit.details?.signal_id ? String(audit.details.signal_id) : null;
+      if (signalKey && !auditMap.has(signalKey) && (audit.details?.reason || audit.details?.gate)) {
+        auditMap.set(signalKey, audit.details);
+      }
+    }
+
+    for (const row of rows) {
+      const matched = tradeMap.get(String(row._id)) || tradeMap.get(String(row.signal_id));
+      if (matched) {
+        row.trade = {
+          trade_id: matched.trade_id || matched.id,
+          status: matched.status,
+          symbol: matched.label || matched.symbol,
+          net_pnl: matched.pnl?.net_pnl
+        };
+        row.trade_taken = true;
+      } else {
+        row.trade_taken = false;
+        const score = row.analysis?.score_after_filters ?? row.signal_data?.confidence;
+        const audit = auditMap.get(String(row.signal_id || row._id));
+        const reason = row.rejection_reason 
+          || row.signal_data?.rejection_reason 
+          || row.signal_data?.reason 
+          || row.analysis?.rejection_reason
+          || audit?.reason;
+        
+        if (reason && reason !== 'SIGNAL_GENERATED' && reason !== 'NONE') {
+          row.why_not_trade = audit?.gate && audit.gate !== reason ? `${audit.gate}: ${reason}` : reason;
+        } else if (score != null && score < 7) {
+          row.why_not_trade = `Score ${score} < 7 (Cutoff Gate)`;
+        } else if (row.signal_data?.decision === 'IGNORED' || row.status === 'IGNORED') {
+          row.why_not_trade = 'Cutoff gate / Filter ignored';
+        } else if (row.signal_data?.signal === 'NEUTRAL' || row.direction === 'NEUTRAL') {
+          row.why_not_trade = 'Setup filters not met (Neutral)';
+        } else {
+          row.why_not_trade = 'Signal generated; execution-gate reason was not recorded';
+        }
+      }
+    }
+
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (error) { return res.status(error.statusCode || 500).json({ success: false, message: 'Unable to read paper signals' }); }
 }
@@ -119,8 +205,45 @@ async function getPaperSignal(req, res) {
     const { ObjectId } = mongoose.Types;
     const rawId = req.params.signal_id;
     const id = ObjectId.isValid(rawId) ? new ObjectId(rawId) : rawId;
-    const row = await database().collection('signals').findOne({ _id: id, user_id: userId }, { projection: { _id: 1, user_id: 1, session_id: 1, strategy_version: 1, opportunity_id: 1, timestamp: 1, analysis: 1, candle: 1, instrument: 1, latency_ms: 1, signal_data: 1, technical_context: 1, ai_validation: 1, status: 1, rejection_reason: 1 } });
+    const db = database();
+    const row = await db.collection('signals').findOne({ _id: id, user_id: userId }, { projection: { _id: 1, signal_id: 1, user_id: 1, session_id: 1, strategy_version: 1, opportunity_id: 1, timestamp: 1, analysis: 1, candle: 1, instrument: 1, latency_ms: 1, signal_data: 1, technical_context: 1, ai_validation: 1, status: 1, rejection_reason: 1 } });
     if (!row) return res.status(404).json({ success: false, message: 'Signal not found' });
+
+    const matched = await db.collection('trades').findOne({
+      $or: [
+        { 'entry.signal_id': row._id },
+        { 'entry.signal_id': String(row._id) },
+        { 'entry.signal_id': row.signal_id }
+      ]
+    }, { projection: { trade_id: 1, id: 1, status: 1, symbol: 1, label: 1, pnl: 1, setup: 1, entry: 1, exit: 1 } });
+
+    if (matched) {
+      row.trade = {
+        trade_id: matched.trade_id || matched.id,
+        status: matched.status,
+        symbol: matched.label || matched.symbol,
+        net_pnl: matched.pnl?.net_pnl,
+        entry: matched.entry,
+        exit: matched.exit
+      };
+      row.trade_taken = true;
+    } else {
+      row.trade_taken = false;
+      const audit = await db.collection('audit_logs').findOne({
+        user_id: userId,
+        'details.signal_id': { $in: [String(row.signal_id || ''), String(row._id)] }
+      }, { projection: { 'details.gate': 1, 'details.reason': 1 } });
+      const score = row.analysis?.score_after_filters ?? row.signal_data?.confidence;
+      const reason = row.rejection_reason || row.signal_data?.rejection_reason || row.signal_data?.reason || row.analysis?.rejection_reason || audit?.details?.reason;
+      if (reason && reason !== 'SIGNAL_GENERATED' && reason !== 'NONE') {
+        row.why_not_trade = audit?.details?.gate && audit.details.gate !== reason ? `${audit.details.gate}: ${reason}` : reason;
+      } else if (score != null && score < 7) {
+        row.why_not_trade = `Score ${score} < 7 (Cutoff Gate)`;
+      } else {
+        row.why_not_trade = 'Signal generated; execution-gate reason was not recorded';
+      }
+    }
+
     return res.json({ success: true, data: row });
   } catch (error) { return res.status(error.statusCode || 500).json({ success: false, message: 'Unable to read signal' }); }
 }
