@@ -175,6 +175,17 @@ const getSessionStatus = async (req, res) => {
     }
 };
 
+const getMarketSnapshot = async (req, res) => {
+    const user_id = req.params.user_id || req.query.user_id;
+    if (!user_id) return res.status(400).json({ success: false, message: 'user_id is required' });
+    try {
+        const response = await axios.get(`${PYTHON_BACKEND_URL}/market-snapshot/${encodeURIComponent(user_id)}`, { timeout: 10000 });
+        return res.status(response.status).json(response.data);
+    } catch (error) {
+        return res.status(error.response?.status || 503).json({ success: false, message: 'Market snapshot unavailable' });
+    }
+};
+
 // Describe only the controls supported and validated by the Python service.
 const getControlPanelConfig = async (_req, res) => {
     try {
@@ -280,6 +291,7 @@ module.exports = {
     startTrading,
     stopTrading,
     getSessionStatus,
+    getMarketSnapshot,
     getControlPanelConfig,
     getUserSessions,
     getTradingDashboard

@@ -41,3 +41,66 @@ dialog .dialog-head h2,dialog .dialog-head p{color:var(--text)}
 dialog .dialog-head .eyebrow{color:var(--muted)}
 .toggle-row{width:100%;display:flex;flex-direction:column;gap:9px}.toggle{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface2)}.toggle b{display:block;color:var(--text);font-size:12px}.toggle small{display:block;color:var(--muted);font-size:11px;margin-top:4px}.switch{position:relative;display:inline-block;width:42px;height:24px;flex:0 0 auto}.switch input{position:absolute;opacity:0;width:0;height:0}.slider{position:absolute;inset:0;border-radius:99px;background:#9aa6b6;cursor:pointer;transition:.2s}.slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}.switch input:checked+.slider{background:var(--green)}.switch input:checked+.slider:before{transform:translateX(18px)}.switch input:focus-visible+.slider{outline:3px solid var(--blue2);outline-offset:2px}
 @media(max-width:700px){.analytics-filters label{flex:1 1 140px}.analytics-filters input{width:100%}.preset-chips{flex:1 1 100%;flex-wrap:wrap}.preset-chips button{flex:1}.analytics-filters #analyticsFilterBtn{width:100%}}
+.closed-positions{margin-top:14px;border-top:1px solid var(--border,#333);padding-top:8px}.closed-position-row{display:grid;grid-template-columns:1fr 2fr auto auto;gap:10px;padding:9px 0;border-bottom:1px solid var(--border,#333);font-size:.85rem;align-items:center}.closed-position-row span{color:var(--muted,#9aa)}.closed-position-row strong{color:var(--text,#fff)}.closed-position-row em{font-style:normal;color:var(--muted,#9aa)}.card-actions{display:flex;gap:8px;align-items:center}@media(max-width:700px){.closed-position-row{grid-template-columns:1fr;gap:3px}}
+.market-snapshot{margin-top:16px}.snapshot-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px}.snapshot-grid>div{padding:12px;background:rgba(255,255,255,.04);border:1px solid var(--border,#333);border-radius:8px}.snapshot-grid span{display:block;color:var(--muted,#9aa);font-size:.75rem;margin-bottom:5px}.snapshot-grid b{display:block;font-size:1rem}@media(max-width:900px){.snapshot-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:600px){.snapshot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ============================================================
+   ANALYTICS PAGE — fully theme-aware, no Bootstrap
+   Uses existing CSS variables: --surface, --surface2, --line,
+   --text, --muted, --blue, --blue2, --green, --greenbg,
+   --red, --redbg, --amber, --shadow
+   ============================================================ */
+
+/* KPI grid — 4 across on desktop, 2 on tablet, 1 on mobile */
+.an-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+@media(max-width:900px){.an-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){.an-kpi-grid{grid-template-columns:1fr}}
+
+/* KPI card */
+.an-kpi-card{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:16px 14px;transition:transform .14s,box-shadow .14s}
+.an-kpi-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.an-kpi-card.an-kpi-dim{opacity:.8}
+.an-kpi-label{display:block;font-size:10px;letter-spacing:1.1px;color:var(--muted);font-weight:800;text-transform:uppercase;margin-bottom:9px}
+.an-kpi-value{display:block;font-size:20px;letter-spacing:-.35px;font-weight:750;color:var(--text)}
+.an-kpi-value.is-positive{color:var(--green)}
+.an-kpi-value.is-negative{color:var(--red)}
+
+/* Chart card — reuses the same look as .card but with extra top margin */
+.an-chart-card{background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:18px 16px;margin-top:14px}
+.an-chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.an-chart-title{margin:0;font-size:13px;font-weight:750;color:var(--text);letter-spacing:-.1px}
+
+/* Chart body wrappers */
+.an-chart-body{position:relative;min-height:60px}
+.an-donut-wrap{max-width:240px;margin:0 auto;position:relative}
+
+/* Placeholder text */
+.an-placeholder{text-align:center;color:var(--muted);font-size:12px;padding:28px 0;margin:0}
+
+/* Two-column row: 40/60 split, stacks on tablet */
+.an-two-col{display:grid;grid-template-columns:2fr 3fr;gap:14px;margin-top:14px}
+@media(max-width:900px){.an-two-col{grid-template-columns:1fr}}
+
+/* Mini table — matches existing table style but without min-width */
+.an-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:14px}
+.an-table th{text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px;padding:8px 8px;border-bottom:2px solid var(--line);font-weight:800}
+.an-table td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--text)}
+.an-table tbody tr:last-child td{border-bottom:0}
+.an-table tbody tr:hover td{background:var(--surface2)}
+
+/* Color helpers for table cells */
+.an-pos{color:var(--green);font-weight:700}
+.an-neg{color:var(--red);font-weight:700}
+
+/* Dot legend beside exit reason label */
+.an-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0}
+
+/* Direction badges */
+.an-badge-call{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.8px;border-radius:99px;padding:3px 9px;text-transform:uppercase;background:var(--blue2);color:var(--blue);border:1px solid rgba(37,99,235,.2)}
+.an-badge-put{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.8px;border-radius:99px;padding:3px 9px;text-transform:uppercase;background:var(--redbg);color:var(--red);border:1px solid rgba(201,64,77,.2)}
+
+/* Warning text */
+.an-warning{font-size:11px;color:var(--amber);margin:10px 0 0;min-height:14px}
+
+/* Analytics tables must NOT inherit the 800px min-width from the global table rule */
+.an-table{min-width:0}

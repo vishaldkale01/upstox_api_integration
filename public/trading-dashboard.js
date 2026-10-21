@@ -2,9 +2,17 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const state = { user: null, config: {}, status: null, pendingAction: null };
+  const state = { user: null, config: {}, status: null, pendingAction: null, statusRefreshInFlight: false, snapshotRefreshInFlight: false, refreshTimer: null, charts: {} };
   const api = (path, options) => fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
-  function applyTheme(theme) { const selected = ['blue', 'dark', 'black'].includes(theme) ? theme : 'light'; document.body.classList.remove('theme-blue', 'theme-dark', 'theme-black'); if (selected !== 'light') document.body.classList.add(`theme-${selected}`); const picker = $('themeSelect'); if (picker) picker.value = selected; localStorage.setItem('dashboardTheme', selected); }
+  function applyTheme(theme) {
+    const selected = ['blue', 'dark', 'black'].includes(theme) ? theme : 'light';
+    document.body.classList.remove('theme-blue', 'theme-dark', 'theme-black');
+    if (selected !== 'light') document.body.classList.add(`theme-${selected}`);
+    const picker = $('themeSelect'); if (picker) picker.value = selected;
+    localStorage.setItem('dashboardTheme', selected);
+    // Reload charts so they pick up the new theme's text/grid colours
+    if (!$('analytics').hidden) loadAnalytics();
+  }
 
   function readUser() {
     const query = new URLSearchParams(location.search);
@@ -20,6 +28,7 @@
   }
 
   function setText(id, value) { const node = $(id); if (node) node.textContent = value == null || value === '' ? 'Unavailable' : String(value); }
+  function formatIst(value) { if (!value) return null; const date = new Date(value); return Number.isNaN(date.valueOf()) ? String(value) : date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); }
   function pct(value) { return value == null ? 'Unavailable' : `${(Number(value) * 100).toFixed(1)}%`; }
   function showMessage(text, kind) { const node = $('message'); node.textContent = text || ''; node.className = `message ${kind || ''}`; }
 
@@ -57,19 +66,47 @@
   function renderStatus(data) {
     state.status = data || {};
     const active = Boolean(data?.active);
-    setText('sessionState', active ? 'Running' : 'Stopped'); setText('sessionHint', active ? `${data.mode || 'PAPER'} · ${data.symbol || 'target unavailable'}` : 'No active paper session');
-    setText('strategyVersion', data?.strategy_version); setText('sessionId', data?.session_id); setText('lastEvaluation', data?.telemetry?.last_evaluation_at || data?.last_evaluation_at);
-    setText('ticks', data?.telemetry?.ticks); setText('candles', data?.telemetry?.candles); setText('evaluations', data?.telemetry?.evaluations); setText('recorderState', data?.recorder?.state);
+    setText('sessionState', active ? 'Running' : 'Stopped'); setText('sessionHint', active ? `${data.mode || 'PAPER'} · ${data.target_symbol || data.symbol || 'target unavailable'}` : 'No active paper session');
+    setText('strategyVersion', data?.strategy_version); setText('sessionId', data?.session_id); setText('lastEvaluation', formatIst(data?.telemetry?.last_evaluation || data?.last_evaluation));
+    setText('ticks', data?.telemetry?.ticks); setText('candles', data?.telemetry?.candles); setText('evaluations', data?.telemetry?.evaluations); setText('recorderState', data?.recorder ? (data.recorder.enabled ? 'Enabled' : 'Disabled') : null);
     const pnl = data?.risk?.pnl; setText('dailyPnl', pnl == null ? null : `₹${Number(pnl).toFixed(2)}`);
-    const tick = data?.telemetry?.last_tick_at || data?.last_tick_at; setText('lastTick', tick ? `Last tick · ${tick}` : 'Last tick unavailable'); setText('feedAge', tick ? 'Last tick received' : null);
+    const snapshot = data?.market_snapshot; const quote = snapshot?.quote || {}; const candle = snapshot?.candle || quote.ohlc || quote || {}; const price = (v) => v == null ? null : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    setText('snapshotOpen', price(candle.open)); setText('snapshotHigh', price(candle.high)); setText('snapshotLow', price(candle.low)); setText('snapshotClose', price(candle.close)); setText('snapshotVwap', price(snapshot?.vwap)); setText('snapshotTrend', snapshot?.trend); setText('snapshotRegime', snapshot?.regime); setText('snapshotDirection', snapshot?.bias); setText('snapshotBias', snapshot?.bias); setText('snapshotTime', snapshot?.timestamp ? `Latest candle · ${formatIst(snapshot.timestamp)} IST` : 'Latest completed candle and indicators');
+    const tick = data?.telemetry?.last_tick || data?.last_tick; setText('lastTick', tick ? `Last tick · ${formatIst(tick)} IST` : 'Last tick unavailable'); setText('feedAge', tick ? 'Last tick received' : null);
     const locked = Boolean(data?.risk?.locked); setText('riskLock', locked ? 'Blocked' : (data?.risk ? 'Open' : null)); setText('blockReason', locked ? (data.risk.reason || 'Risk lock active — reason unavailable') : 'No active risk lock reported');
-    const pos = data?.active_trade || data?.position; $('positionEmpty').hidden = Boolean(pos); $('positionDetails').hidden = !pos; $('positionBadge').textContent = pos ? 'OPEN' : 'NONE';
-    if (pos) { setText('positionSymbol', pos.symbol); setText('positionId', pos.trade_id || pos.id); setText('positionStatus', pos.status); }
+    const pos = data?.active_trade || data?.position; $('positionEmpty').hidden = Boolean(pos); $('positionDetails').hidden = !pos; $('positionBadge').textContent = pos ? 'OPEN' : 'NONE'; if (!pos) { $('positionEmptyTitle').textContent = 'No open position'; $('positionEmptyText').textContent = active ? 'There is currently no active paper trade.' : 'The session is stopped and has no active position.'; }
+    if (pos) { $('positionTitle').textContent = 'Open position'; $('positionSubtitle').textContent = 'Position reported by the execution service'; setText('positionSymbol', pos.symbol); setText('positionId', pos.trade_id || pos.id); setText('positionStatus', pos.status); setText('positionTimes', pos.entry?.time || pos.entry_time || null); setText('positionPnl', pos.pnl?.net_pnl == null ? null : `₹${Number(pos.pnl.net_pnl).toFixed(2)}`); setText('positionExitReason', null); }
+    else if (state.user?.id) loadLastClosedTrades();
     $('stopBtn').disabled = !active; setFormDisabled(active); $('connection').textContent = 'Connected'; $('connection').className = 'connection connected';
   }
 
-  function setUnavailable() { ['sessionState','dailyPnl','feedAge','riskLock','ticks','candles','evaluations','sessionId','strategyVersion','lastEvaluation','recorderState'].forEach((id) => setText(id, null)); setText('sessionHint', 'Execution service unavailable'); setText('lastTick', 'Last tick unavailable'); $('connection').textContent = 'Unavailable'; $('connection').className = 'connection'; }
-  async function refreshStatus() { try { const r = await api(`/trading-status/${encodeURIComponent(state.user.id)}`); if (!r.ok) throw new Error(); renderStatus(await r.json()); } catch (_) { setUnavailable(); } }
+  async function loadLastClosedTrades() {
+    try {
+      const response = await api(`/paper-trades?user_id=${encodeURIComponent(state.user.id)}&limit=20`);
+      if (!response.ok) throw new Error();
+      const rows = (await response.json()).data || [];
+      const allClosed = rows.filter((row) => String(row.status || '').toUpperCase() === 'CLOSED' && row.exit);
+      const latestSession = allClosed[0]?.session_id;
+      const closed = latestSession ? allClosed.filter((row) => row.session_id === latestSession) : allClosed;
+      if (state.status?.active) return;
+      if (closed.length) {
+        const total = closed.reduce((sum, row) => sum + (Number(row.pnl?.net_pnl) || 0), 0);
+        setText('dailyPnl', `₹${total.toFixed(2)}`); setText('feedAge', 'Inactive'); setText('lastTick', 'Session stopped'); setText('riskLock', 'Not active'); setText('blockReason', 'No active session'); setText('ticks', null); setText('candles', null); setText('evaluations', closed.length); setText('sessionHint', 'No active paper session · today\'s persisted summary'); setText('positionEmptyText', 'No active position. Showing completed paper trades.');
+        setText('sessionId', closed[0].session_id); setText('strategyVersion', closed[0].strategy_version || state.config.strategy_version); setText('lastEvaluation', formatIst(closed[0].exit?.time)); setText('recorderState', 'Unavailable');
+      }
+      const trade = closed[0];
+      if (!trade) return;
+      $('positionTitle').textContent = 'Last closed position'; $('positionSubtitle').textContent = 'Most recent completed paper trade'; $('positionBadge').textContent = 'CLOSED'; $('positionEmpty').hidden = true; $('positionDetails').hidden = false;
+      $('closedPositionToggle').hidden = false; $('closedPositionToggle').onclick = () => { const list = $('closedPositions'); list.hidden = !list.hidden; if (!list.hidden) list.innerHTML = closed.map((row) => `<div class="closed-position-row"><b>${row.label || row.symbol || 'Unavailable'}</b><span>${formatIst(row.entry?.time) || 'Unavailable'} → ${formatIst(row.exit?.time) || 'Unavailable'}</span><strong>${row.pnl?.net_pnl == null ? 'Unavailable' : `₹${Number(row.pnl.net_pnl).toFixed(2)}`}</strong><em>${row.exit?.reason || 'Unavailable'}</em></div>`).join(''); };
+      $('openPositionToggle').onclick = () => { $('closedPositions').hidden = true; $('positionDetails').hidden = true; $('positionEmpty').hidden = false; $('positionTitle').textContent = 'Open position'; $('positionSubtitle').textContent = 'No active position after session stop'; $('positionBadge').textContent = 'NONE'; };
+      setText('positionSymbol', trade.label || trade.symbol); setText('positionId', trade.trade_id || trade.id || trade._id); setText('positionStatus', trade.status); setText('positionTimes', `${formatIst(trade.entry?.time) || 'Unavailable'} → ${formatIst(trade.exit?.time) || 'Unavailable'}`); setText('positionPnl', trade.pnl?.net_pnl == null ? null : `₹${Number(trade.pnl.net_pnl).toFixed(2)}`); setText('positionExitReason', trade.exit?.reason);
+    } catch (_) { /* live status remains authoritative; historical panel stays empty when unavailable */ }
+  }
+
+  function setUnavailable() { setText('sessionHint', 'Showing last known data · execution service unavailable'); setText('feedAge', 'No live feed'); setText('lastTick', 'Python service unavailable'); setText('blockReason', 'Risk status unavailable'); $('connection').textContent = 'Unavailable'; $('connection').className = 'connection'; loadLastClosedTrades(); loadPersistedSnapshot(); }
+  async function refreshStatus() { if (state.statusRefreshInFlight) return; state.statusRefreshInFlight = true; try { const r = await api(`/trading-status/${encodeURIComponent(state.user.id)}`); if (!r.ok) throw new Error(); const data = await r.json(); renderStatus(data); if (data?.active) { if (!state.refreshTimer) state.refreshTimer = setInterval(() => { refreshStatus(); refreshMarketSnapshot(); }, 15000); } else if (state.refreshTimer) { clearInterval(state.refreshTimer); state.refreshTimer = null; } } catch (_) { setUnavailable(); if (state.refreshTimer) { clearInterval(state.refreshTimer); state.refreshTimer = null; } } finally { state.statusRefreshInFlight = false; } }
+  async function refreshMarketSnapshot() { if (state.snapshotRefreshInFlight) return; state.snapshotRefreshInFlight = true; try { const r = await api(`/market-snapshot/${encodeURIComponent(state.user.id)}`); if (!r.ok) throw new Error(); const d = await r.json(); const q = d.quote || d.candle || {}; const o = q.ohlc || q; const val = (v) => v == null ? null : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }); const hasOhlc = ['open','high','low','close'].some((key) => o[key] != null); if (hasOhlc) { setText('snapshotOpen', val(o.open)); setText('snapshotHigh', val(o.high)); setText('snapshotLow', val(o.low)); setText('snapshotClose', val(o.close)); } if (d.vwap != null) setText('snapshotVwap', val(d.vwap)); if (d.trend) setText('snapshotTrend', d.trend); if (d.regime) setText('snapshotRegime', d.regime); if (d.bias) { setText('snapshotDirection', d.bias); setText('snapshotBias', d.bias); } if (d.timestamp) setText('snapshotTime', `Latest candle · ${formatIst(d.timestamp)} IST`); } catch (_) {} finally { state.snapshotRefreshInFlight = false; } }
+  async function loadPersistedSnapshot() { try { const r = await api(`/paper-signals?user_id=${encodeURIComponent(state.user.id)}&limit=1`); if (!r.ok) return; const row = (await r.json()).data?.[0]; if (!row || state.status?.active) return; const c = row.candle || {}; const a = row.analysis || {}; const val = (v) => v == null ? null : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }); if (['open','high','low','close'].some((key) => c[key] != null)) { setText('snapshotOpen', val(c.open)); setText('snapshotHigh', val(c.high)); setText('snapshotLow', val(c.low)); setText('snapshotClose', val(c.close)); } setText('snapshotVwap', val(a.vwap)); setText('snapshotTrend', a.tf15_trend); setText('snapshotRegime', a.regime); setText('snapshotDirection', a.dow_bias || a.tf15_trend); setText('snapshotBias', a.dow_bias || a.tf15_trend); setText('snapshotTime', c.timestamp ? `Last stored candle · ${formatIst(c.timestamp)} IST` : 'Last stored signal'); } catch (_) {} }
 
   function setFormDisabled(disabled) { document.querySelectorAll('#configForm input, #configForm select').forEach((n) => { n.disabled = disabled || n.id === 'tradeMode'; }); }
   function navigate(page) { document.querySelectorAll('.page').forEach((p) => { p.hidden = p.id !== page; }); document.querySelectorAll('[data-page]').forEach((b) => b.classList.toggle('active', b.dataset.page === page)); const titles = { overview: ['Overview', 'Live paper-session health and entry protection'], configuration: ['Configuration', 'Review supported settings before starting'], sessions: ['Past sessions', 'Completed recording history from the execution service'], trades: ['Trade history', 'Paper fills and lifecycle outcomes'], signals: ['Signals', 'Stored strategy decisions and full signal context'], analytics: ['Analytics', 'Paper performance after recorded costs'] }; setText('breadcrumb', titles[page][0]); setText('pageTitle', titles[page][0]); setText('pageSubtitle', titles[page][1]); if (page === 'configuration') renderReview(); if (page === 'sessions' || page === 'trades') loadPaperHistory(page); if (page === 'signals') loadSignals(); if (page === 'analytics') loadAnalytics(); }
@@ -104,7 +141,102 @@
       body.querySelectorAll('.signal-detail').forEach((button) => button.addEventListener('click', () => openSignal(button.dataset.signalId)));
     } catch (_) { $('signalCount').textContent = 'Unavailable'; renderHistoryUnavailable('signals', 'The signal-history service is unavailable.'); }
   }
-  async function loadAnalytics() { const from = $('analyticsFrom')?.value || ''; const to = $('analyticsTo')?.value || ''; const error = $('analyticsFilterError'); if (from && to && from > to) { error.textContent = 'From date must not be after To date.'; error.hidden = false; return; } error.hidden = true; const params = new URLSearchParams({ user_id: state.user.id, include_signals: 'false' }); if (from) params.set('from', from); if (to) params.set('to', to); history.replaceState(null, '', `${location.pathname}?${params.toString()}`); try { const response = await api(`/api/analytics?${params.toString()}`); if (!response.ok) throw new Error(); const d = (await response.json()).data || {}; const money = (v) => v == null ? 'Unavailable' : `₹${Number(v).toFixed(2)}`; setText('analyticsNet', money(d.net_pnl)); setText('analyticsGross', money(d.gross_pnl)); setText('analyticsBrokerage', money(d.brokerage)); setText('analyticsWinRate', `${(Number(d.win_rate || 0) * 100).toFixed(1)}%`); setText('analyticsSample', d.sample_size ?? 0); setText('analyticsFeeDrag', d.fees_pct_gross_profit == null ? 'n/a' : `${Number(d.fees_pct_gross_profit).toFixed(2)}%`); setText('analyticsExpectancy', money(d.net_per_trade)); setText('analyticsProfitFactor', d.profit_factor == null ? 'n/a' : Number(d.profit_factor).toFixed(2)); setText('analyticsQuality', d.data_quality?.recording_validity || 'Unavailable'); $('analyticsExitReasons').textContent = JSON.stringify(d.by_exit_reason || {}, null, 2); $('analyticsHours').textContent = JSON.stringify(d.entry_hours || [], null, 2); $('analyticsDirections').textContent = JSON.stringify(d.directions || [], null, 2); $('analyticsCurve').textContent = JSON.stringify(d.equity_curve || [], null, 2); $('analyticsWarning').textContent = d.range_capped ? 'Signal joins are capped to 90 days.' : ''; $('analyticsSubtitle').textContent = from || to ? `Paper performance for ${from || 'all time'} to ${to || 'today'}` : 'Paper performance calculated from stored trades'; } catch (_) { ['analyticsNet','analyticsGross','analyticsFeeDrag','analyticsExpectancy','analyticsProfitFactor','analyticsBrokerage','analyticsWinRate','analyticsSample','analyticsQuality'].forEach((id) => setText(id, null)); $('analyticsExitReasons').textContent = 'Unavailable'; } }
+  async function loadAnalytics() {
+    const from = $('analyticsFrom')?.value || '';
+    const to = $('analyticsTo')?.value || '';
+    const error = $('analyticsFilterError');
+    if (from && to && from > to) { error.textContent = 'From date must not be after To date.'; error.hidden = false; return; }
+    error.hidden = true;
+    const params = new URLSearchParams({ user_id: state.user.id, include_signals: 'false' });
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
+    // Destroy existing charts
+    ['equityCurve', 'exitReasons', 'entryHours'].forEach((key) => { if (state.charts[key]) { state.charts[key].destroy(); delete state.charts[key]; } });
+    const money = (v) => v == null ? 'Unavailable' : `₹${Number(v).toFixed(2)}`;
+    // Read theme colors from computed CSS so they match every theme automatically
+    const cs = getComputedStyle(document.documentElement);
+    const mutedColor = cs.getPropertyValue('--muted').trim() || '#738197';
+    const lineColor  = cs.getPropertyValue('--line').trim()  || '#e6ebf2';
+    // Palette that works across all four themes (uses semi-transparent so dark bg shines through)
+    const chartColors = ['#5b7cf2','#12956b','#e0963a','#c9404d','#7c3aed','#0891b2','#be123c','#2d9d78'];
+    // Reset KPIs
+    ['analyticsNet','analyticsGross','analyticsFeeDrag','analyticsExpectancy','analyticsProfitFactor','analyticsBrokerage','analyticsWinRate','analyticsSample'].forEach((id) => setText(id, null));
+    try {
+      const response = await api(`/api/analytics?${params.toString()}`);
+      if (!response.ok) throw new Error();
+      const d = (await response.json()).data || {};
+      setText('analyticsNet', money(d.net_pnl));
+      setText('analyticsGross', money(d.gross_pnl));
+      setText('analyticsBrokerage', money(d.brokerage));
+      setText('analyticsWinRate', `${(Number(d.win_rate || 0) * 100).toFixed(1)}%`);
+      setText('analyticsSample', d.sample_size ?? 0);
+      setText('analyticsFeeDrag', d.fees_pct_gross_profit == null ? 'n/a' : `${Number(d.fees_pct_gross_profit).toFixed(2)}%`);
+      setText('analyticsExpectancy', money(d.net_per_trade));
+      setText('analyticsProfitFactor', d.profit_factor == null ? 'n/a' : Number(d.profit_factor).toFixed(2));
+      setText('analyticsQuality', d.data_quality?.recording_validity || 'Unavailable');
+      $('analyticsWarning').textContent = d.range_capped ? 'Signal joins are capped to 90 days.' : '';
+      $('analyticsSubtitle').textContent = from || to ? `Paper performance for ${from || 'all time'} to ${to || 'today'}` : 'Paper performance calculated from stored trades';
+      // Net P&L: use CSS class so var(--green/--red) applies correctly
+      const netEl = $('analyticsNet');
+      if (netEl && d.net_pnl != null) {
+        netEl.classList.remove('an-pos', 'an-neg');
+        if (Number(d.net_pnl) > 0) netEl.classList.add('an-pos');
+        else if (Number(d.net_pnl) < 0) netEl.classList.add('an-neg');
+      }
+      // Equity Curve (line)
+      const curve = Array.isArray(d.equity_curve) ? d.equity_curve : [];
+      const curvePlaceholder = $('equityCurvePlaceholder');
+      const curveCanvas = $('equityCurveChart');
+      curvePlaceholder.hidden = curve.length > 0; curveCanvas.hidden = curve.length === 0;
+      if (curve.length) {
+        let cumulative = 0;
+        const labels = curve.map((x) => x._id);
+        const values = curve.map((x) => { cumulative += Number(x.net || 0); return cumulative; });
+        const posColor = 'rgba(18,149,107,0.9)', negColor = 'rgba(201,64,77,0.9)';
+        state.charts.equityCurve = new Chart(curveCanvas, { type: 'line', data: { labels, datasets: [{ label: 'Cumulative Net P&L', data: values, fill: true, tension: 0.38, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 5, segment: { borderColor: (ctx) => ctx.p1.parsed.y >= 0 ? posColor : negColor }, borderColor: posColor, backgroundColor: 'rgba(18,149,107,0.06)' }] }, options: { responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ₹${Number(c.raw).toFixed(2)}` } } }, scales: { x: { grid: { color: lineColor }, ticks: { color: mutedColor, maxTicksLimit: 10, maxRotation: 0 } }, y: { grid: { color: lineColor }, ticks: { color: mutedColor, callback: (v) => `₹${v}` } } } } });
+      }
+      // Exit Reasons (doughnut)
+      const exitObj = (d.by_exit_reason && typeof d.by_exit_reason === 'object' && !Array.isArray(d.by_exit_reason)) ? d.by_exit_reason : {};
+      const exitEntries = Object.entries(exitObj);
+      const exitPlaceholder = $('exitReasonsPlaceholder');
+      const exitCanvas = $('exitReasonsChart');
+      const exitTableEl = $('analyticsExitReasonsTable');
+      exitPlaceholder.hidden = exitEntries.length > 0; exitCanvas.hidden = exitEntries.length === 0;
+      if (exitEntries.length) {
+        state.charts.exitReasons = new Chart(exitCanvas, { type: 'doughnut', data: { labels: exitEntries.map((e) => e[0]), datasets: [{ data: exitEntries.map((e) => e[1]), backgroundColor: chartColors, borderColor: lineColor, borderWidth: 2, hoverOffset: 8 }] }, options: { responsive: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: mutedColor, font: { size: 11 }, padding: 12, boxWidth: 12 } }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw} trades` } } } } });
+        const total = exitEntries.reduce((s, e) => s + Number(e[1]), 0);
+        exitTableEl.innerHTML = `<table class="an-table"><thead><tr><th>Exit Reason</th><th>Trades</th><th>%</th></tr></thead><tbody>${exitEntries.map(([reason, count], i) => `<tr><td><span class="an-dot" style="background:${chartColors[i % chartColors.length]}"></span>${reason}</td><td>${count}</td><td>${total ? ((count / total) * 100).toFixed(1) : 0}%</td></tr>`).join('')}</tbody></table>`;
+      } else { exitTableEl.innerHTML = ''; }
+      // Entry Hours (bar)
+      const hours = Array.isArray(d.entry_hours) ? d.entry_hours : [];
+      const hourPlaceholder = $('entryHoursPlaceholder');
+      const hourCanvas = $('entryHoursChart');
+      const hourTableEl = $('analyticsHoursTable');
+      hourPlaceholder.hidden = hours.length > 0; hourCanvas.hidden = hours.length === 0;
+      if (hours.length) {
+        state.charts.entryHours = new Chart(hourCanvas, { type: 'bar', data: { labels: hours.map((x) => `${String(x._id).padStart(2,'0')}:00`), datasets: [{ label: 'Trades', data: hours.map((x) => x.trades || 0), backgroundColor: 'rgba(91,124,242,0.75)', borderRadius: 4 }, { label: 'Wins', data: hours.map((x) => x.wins || 0), backgroundColor: 'rgba(18,149,107,0.75)', borderRadius: 4 }] }, options: { responsive: true, plugins: { legend: { labels: { color: mutedColor, font: { size: 11 }, boxWidth: 12 } }, tooltip: { mode: 'index' } }, scales: { x: { grid: { color: lineColor }, ticks: { color: mutedColor, maxRotation: 0 } }, y: { grid: { color: lineColor }, ticks: { color: mutedColor, stepSize: 1 }, beginAtZero: true } } } });
+        hourTableEl.innerHTML = `<table class="an-table"><thead><tr><th>Hour</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Net</th></tr></thead><tbody>${hours.map((x) => { const wr = x.trades ? ((x.wins * 100 / x.trades).toFixed(1) + '%') : '—'; const net = Number(x.net || 0); return `<tr><td>${String(x._id).padStart(2,'0')}:00</td><td>${x.trades}</td><td>${x.wins}</td><td>${wr}</td><td class="${net >= 0 ? 'an-pos' : 'an-neg'}">₹${net.toFixed(2)}</td></tr>`; }).join('')}</tbody></table>`;
+      } else { hourTableEl.innerHTML = ''; }
+      // CALL vs PUT (table)
+      const dirs = Array.isArray(d.directions) ? d.directions : [];
+      const dirContainer = $('analyticsDirectionsContent');
+      const dirPlaceholder = $('analyticsDirectionsPlaceholder');
+      if (dirs.length) {
+        dirPlaceholder.hidden = true;
+        const rows = dirs.map((x) => { const losses = (x.trades||0)-(x.wins||0); const wr = x.trades ? ((x.wins*100/x.trades).toFixed(1)+'%') : '—'; const net = Number(x.net||0); const avg = x.trades ? Number(net/x.trades) : null; const isCall = String(x._id||'').toUpperCase()==='CALL'; return `<tr><td><span class="${isCall?'an-badge-call':'an-badge-put'}">${x._id||'Unknown'}</span></td><td>${x.trades||0}</td><td class="an-pos">${x.wins||0}</td><td class="an-neg">${losses}</td><td>${wr}</td><td class="${net>=0?'an-pos':'an-neg'}">₹${net.toFixed(2)}</td><td class="${avg!=null&&avg>=0?'an-pos':'an-neg'}">${avg!=null?'₹'+avg.toFixed(2):'—'}</td></tr>`; }).join('');
+        dirContainer.innerHTML = `<table class="an-table"><thead><tr><th>Direction</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Win Rate</th><th>Net P&amp;L</th><th>Avg Net</th></tr></thead><tbody>${rows}</tbody></table>`;
+        dirContainer.appendChild(dirPlaceholder);
+      } else {
+        dirPlaceholder.hidden = false;
+        dirContainer.innerHTML = '';
+        dirContainer.appendChild(dirPlaceholder);
+      }
+    } catch (_) {
+      ['analyticsNet','analyticsGross','analyticsFeeDrag','analyticsExpectancy','analyticsProfitFactor','analyticsBrokerage','analyticsWinRate','analyticsSample','analyticsQuality'].forEach((id) => setText(id, null));
+      $('analyticsWarning').textContent = 'Analytics service unavailable.';
+    }
+  }
   function renderSignalTable(row) { const values = { signal_id: row.signal_id || row._id, timestamp: row.timestamp, decision: row.signal_data?.decision || row.analysis?.decision, direction: row.signal_data?.signal || row.analysis?.direction, setup: row.signal_data?.setup || row.analysis?.setup_detected, confidence: row.signal_data?.confidence ?? row.analysis?.score_after_filters, rejection_reason: row.signal_data?.rejection_reason ?? row.analysis?.rejection_reason, session_id: row.session_id, strategy_version: row.strategy_version, opportunity_id: row.opportunity_id, analysis: row.analysis, candle: row.candle, technical_context: row.technical_context, score_components: row.analysis?.score_components }; const key = 'signalFields'; let visible = JSON.parse(localStorage.getItem(key) || 'null') || Object.keys(values); const picker = $('signalFieldPicker') || document.createElement('div'); picker.id = 'signalFieldPicker'; picker.className = 'signal-field-picker'; picker.hidden = true; const dialog = $('signalDialog'); if (!picker.parentElement) dialog.insertBefore(picker, $('signalDialogBody')); const table = $('signalDialogTable') || document.createElement('div'); table.id = 'signalDialogTable'; table.className = 'signal-detail-table'; if (!table.parentElement) dialog.insertBefore(table, $('signalDialogBody')); $('signalDialogBody').hidden = true; picker.innerHTML = Object.keys(values).map((field) => `<label><input type="checkbox" data-field="${field}" ${visible.includes(field) ? 'checked' : ''}> ${field}</label>`).join(''); picker.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => { visible = [...picker.querySelectorAll('input:checked')].map((node) => node.dataset.field); localStorage.setItem(key, JSON.stringify(visible)); renderSignalTable(row); })); table.innerHTML = `<table><tbody>${visible.filter((field) => values[field] !== undefined && values[field] !== null).map((field) => `<tr><td>${field}</td><td><code>${typeof values[field] === 'object' ? JSON.stringify(values[field], null, 2) : String(values[field])}</code></td></tr>`).join('')}</tbody></table>`; $('signalFieldsBtn')?.addEventListener('click', () => { picker.hidden = !picker.hidden; }); }
   async function openSignal(signalId) {
     try {
@@ -143,14 +275,6 @@
   async function confirmAction() { const action = state.pendingAction; $('confirmDialog').close(); try { if (action === 'start') { const p = collectForm(); if (!state.user.token) return showMessage('An access token is required to start a session.', 'error'); const r = await api('/start-trading', { method: 'POST', body: JSON.stringify(p) }); if (!r.ok) throw new Error(await r.text()); showMessage('Paper session start requested.', 'ok'); } else { const r = await api('/stop-trading', { method: 'POST', body: JSON.stringify({ user_id: state.user.id, access_token: state.user.token }) }); if (!r.ok) throw new Error(await r.text()); showMessage('Paper session stop requested.', 'ok'); } await refreshStatus(); } catch (e) { showMessage(e.message || 'Request failed.', 'error'); } }
 
   async function loadConfig() { try { const r = await api('/control-panel/config'); if (!r.ok) throw new Error(); state.config = await r.json(); applyDefaults(state.config.defaults); setText('strategyVersion', state.config.strategy_version); setText('strategyFlags', state.config.frozen_strategy?.setups?.join(' · ')); renderReview(); } catch (_) { showMessage('Configuration metadata unavailable; backend defaults were not loaded.', 'error'); renderReview(); } }
-  document.addEventListener('DOMContentLoaded', () => { readUser(); document.querySelectorAll('[data-page]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.page))); document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go))); $('configureBtn').addEventListener('click', () => navigate('configuration')); $('refreshBtn').addEventListener('click', () => { refreshStatus(); loadConfig(); }); $('stopBtn').addEventListener('click', () => openConfirm('stop')); $('startBtn').addEventListener('click', () => openConfirm('start')); $('cancelConfirm').addEventListener('click', () => $('confirmDialog').close()); $('confirmAction').addEventListener('click', confirmAction); $('logoutBtn').addEventListener('click', () => { if (state.status?.active) return showMessage('Stop the active paper session before signing out.', 'error'); location.href = '/login'; }); $('configForm').addEventListener('input', renderReview); $('signalFilterBtn').addEventListener('click', loadSignals); $('closeSignalDialog').addEventListener('click', () => $('signalDialog').close()); navigate('overview'); loadConfig().then(refreshStatus); setInterval(refreshStatus, 15000); });
+  document.addEventListener('DOMContentLoaded', () => { readUser(); document.querySelectorAll('[data-page]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.page))); document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go))); $('configureBtn').addEventListener('click', () => navigate('configuration')); $('refreshBtn').addEventListener('click', () => { refreshStatus(); refreshMarketSnapshot(); loadConfig(); }); $('stopBtn').addEventListener('click', () => openConfirm('stop')); $('startBtn').addEventListener('click', () => openConfirm('start')); $('cancelConfirm').addEventListener('click', () => $('confirmDialog').close()); $('confirmAction').addEventListener('click', confirmAction); $('logoutBtn').addEventListener('click', () => { if (state.status?.active) return showMessage('Stop the active paper session before signing out.', 'error'); location.href = '/login'; }); $('configForm').addEventListener('input', renderReview); $('signalFilterBtn').addEventListener('click', loadSignals); $('closeSignalDialog').addEventListener('click', () => $('signalDialog').close()); navigate('overview'); loadConfig().then(() => { refreshStatus(); refreshMarketSnapshot(); }); });
   document.addEventListener('DOMContentLoaded', () => { applyTheme(localStorage.getItem('dashboardTheme') || 'light'); $('themeSelect')?.addEventListener('change', (event) => applyTheme(event.target.value)); document.querySelectorAll('[data-page]').forEach((button) => button.addEventListener('click', () => { document.body.dataset.page = button.dataset.page; })); $('analyticsFilterBtn')?.addEventListener('click', loadAnalytics); document.querySelectorAll('[data-range]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-range]').forEach((chip) => chip.classList.remove('active')); button.classList.add('active'); const today = new Date(); const iso = (d) => d.toISOString().slice(0, 10); const kind = button.dataset.range; if (kind === 'all') { $('analyticsFrom').value = ''; $('analyticsTo').value = ''; } else { const from = new Date(today); if (kind === '7') from.setDate(today.getDate() - 6); if (kind === '30') from.setDate(today.getDate() - 29); $('analyticsFrom').value = iso(from); $('analyticsTo').value = iso(today); } loadAnalytics(); })); });
-  function renderAnalyticsVisuals() {
-    const table = (el, headers, rows) => { if (!el || !rows.length) return; el.innerHTML = `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((v) => `<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>`; };
-    const observe = (id, headers, parse) => { const el = $(id); if (!el || el.dataset.visualized) return; const observer = new MutationObserver(() => { try { const value = JSON.parse(el.textContent); const rows = parse(value); if (rows.length) { table(el, headers, rows); el.dataset.visualized = '1'; observer.disconnect(); } } catch (_) {} }); observer.observe(el, { childList: true, characterData: true }); };
-    observe('analyticsDirections', ['Side', 'Trades', 'Wins', 'Win rate', 'Net'], (v) => (Array.isArray(v) ? v : []).map((x) => [x._id || 'Unavailable', x.trades, x.wins, x.trades ? `${(x.wins * 100 / x.trades).toFixed(1)}%` : 'Unavailable', `₹${Number(x.net || 0).toFixed(2)}`]));
-    observe('analyticsHours', ['Hour', 'Trades', 'Wins', 'Win rate', 'Net'], (v) => (Array.isArray(v) ? v : []).map((x) => [`${String(x._id).padStart(2, '0')}:00`, x.trades, x.wins, x.trades ? `${(x.wins * 100 / x.trades).toFixed(1)}%` : 'Unavailable', `₹${Number(x.net || 0).toFixed(2)}`]));
-    observe('analyticsCurve', ['Date', 'Cumulative net'], (v) => { let total = 0; return (Array.isArray(v) ? v : []).map((x) => { total += Number(x.net || 0); return [x._id, `₹${total.toFixed(2)}`]; }); });
-  }
-  document.addEventListener('DOMContentLoaded', renderAnalyticsVisuals);
 }());

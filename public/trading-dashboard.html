@@ -15,8 +15,9 @@
 <div id="message" role="status" aria-live="polite" hidden></div>
 <section id="overview" class="page">
 <div class="metrics"><article class="metric"><span>SESSION STATE</span><b id="sessionState">Unavailable</b><small id="sessionHint">Waiting for execution service</small></article><article class="metric"><span>DAILY NET P&amp;L</span><b id="dailyPnl">Unavailable</b><small>Reported by the risk engine</small></article><article class="metric"><span>MARKET FEED</span><b id="feedAge">Unavailable</b><small id="lastTick">Last received tick</small></article><article class="metric"><span>ENTRY PROTECTION</span><b id="riskLock">Unavailable</b><small id="blockReason">Block reason unavailable</small></article></div>
+<section class="card market-snapshot"><div class="card-head"><div><h2>Market snapshot</h2><p id="snapshotTime">Latest completed candle and indicators</p></div><span class="badge" id="snapshotBias">Unavailable</span></div><div class="snapshot-grid"><div><span>Open</span><b id="snapshotOpen">Unavailable</b></div><div><span>High</span><b id="snapshotHigh">Unavailable</b></div><div><span>Low</span><b id="snapshotLow">Unavailable</b></div><div><span>Close</span><b id="snapshotClose">Unavailable</b></div><div><span>VWAP</span><b id="snapshotVwap">Unavailable</b></div><div><span>Trend</span><b id="snapshotTrend">Unavailable</b></div><div><span>Regime</span><b id="snapshotRegime">Unavailable</b></div><div><span>Bias</span><b id="snapshotDirection">Unavailable</b></div></div></section>
 <div class="overview-grid"><section class="card"><div class="card-head"><div><h2>Session activity</h2><p>Current execution service counters</p></div><span class="badge">Read only</span></div><div class="activity-metrics"><div><span>Market ticks</span><b id="ticks">Unavailable</b></div><div><span>Candles</span><b id="candles">Unavailable</b></div><div><span>Evaluations</span><b id="evaluations">Unavailable</b></div></div><dl class="key-values"><div><dt>Session ID</dt><dd id="sessionId">Unavailable</dd></div><div><dt>Strategy version</dt><dd id="strategyVersion">Unavailable</dd></div><div><dt>Last evaluation</dt><dd id="lastEvaluation">Unavailable</dd></div><div><dt>Market recording</dt><dd id="recorderState">Unavailable</dd></div></dl></section>
-<section class="card"><div class="card-head"><div><h2>Open position</h2><p>Position reported by the execution service</p></div><span class="badge" id="positionBadge">Unavailable</span></div><div class="empty-position" id="positionEmpty"><span class="empty-icon">⇄</span><h3>Position data unavailable</h3><p>Connect to the service to check the current position.</p></div><dl class="key-values" id="positionDetails" hidden><div><dt>Instrument</dt><dd id="positionSymbol"></dd></div><div><dt>Trade ID</dt><dd id="positionId"></dd></div><div><dt>Status</dt><dd id="positionStatus"></dd></div><div><dt>Entry / unrealized P&amp;L</dt><dd>Unavailable</dd></div></dl></section></div>
+<section class="card"><div class="card-head"><div><h2 id="positionTitle">Position</h2><p id="positionSubtitle">Position reported by the execution service</p></div><div class="card-actions"><button class="button secondary position-toggle" id="openPositionToggle" type="button">Open position</button><button class="button secondary position-toggle" id="closedPositionToggle" type="button">Closed positions</button><span class="badge" id="positionBadge">Unavailable</span></div></div><div class="empty-position" id="positionEmpty"><span class="empty-icon">⇄</span><h3 id="positionEmptyTitle">Position data unavailable</h3><p id="positionEmptyText">Connect to the service to check the current position.</p></div><dl class="key-values" id="positionDetails" hidden><div><dt>Instrument</dt><dd id="positionSymbol"></dd></div><div><dt>Trade ID</dt><dd id="positionId"></dd></div><div><dt>Status</dt><dd id="positionStatus"></dd></div><div><dt>Entry / exit</dt><dd id="positionTimes">Unavailable</dd></div><div><dt>Net P&amp;L</dt><dd id="positionPnl">Unavailable</dd></div><div><dt>Exit reason</dt><dd id="positionExitReason">Unavailable</dd></div></dl><div id="closedPositions" class="closed-positions" hidden></div></section></div>
 <section class="card protection"><div class="protection-icon">✓</div><div><h2>Risk protection stays enabled</h2><p>The daily realized-loss limit blocks new entries. Stop-loss cooldowns and unresolved exit-price blocks remain enforced. A clear daily risk lock does not guarantee entry eligibility: strategy and execution checks still apply.</p></div><button class="text-button" data-go="configuration">Review settings →</button></section>
 </section>
 <section id="configuration" class="page" hidden><div class="configuration-layout"><form id="configForm" novalidate><div class="notice">Settings apply to the next session. During the observation period, retain the approved capital, sizing, risk and execution settings.</div><section class="card config-section">
@@ -85,7 +86,126 @@
 <section id="sessions" class="page" hidden><section class="card history-card"><div class="card-head"><div><h2>Past paper sessions</h2><p>Session identity, performance and recording completeness</p></div><span class="badge">Unavailable</span></div><div class="table-scroll"><table><thead><tr><th>Date</th><th>Session ID</th><th>Strategy version</th><th>Trades</th><th>Net P&amp;L</th><th>Recording validity</th></tr></thead><tbody><tr><td colspan="6"><div class="table-empty"><span class="empty-icon">◷</span><h3>Session history unavailable</h3><p>The backend does not currently expose persisted paper-session history or recording validation results. No session totals are inferred from local browser state.</p></div></td></tr></tbody></table></div></section></section>
 <section id="signals" class="page" hidden><section class="card history-card"><div class="card-head"><div><h2>Signal history</h2><p>All persisted paper decisions from the signals collection</p></div><span class="badge" id="signalCount">Unavailable</span></div><div class="signal-filters"><input id="signalSearch" placeholder="Search setup or opportunity"><select id="signalStatus"><option value="">All decisions</option><option value="SIGNAL_GENERATED">Generated</option><option value="REJECTED">Rejected</option><option value="IGNORED">Ignored</option></select><select id="signalSetup"><option value="">All setups</option></select><button class="button secondary" id="signalFilterBtn">Apply filters</button></div><div class="table-scroll"><table><thead><tr><th>Time</th><th>Setup</th><th>Direction / decision</th><th>Score</th><th>Session</th><th>Opportunity</th><th>Details</th></tr></thead><tbody><tr><td colspan="7"><div class="table-empty"><span class="empty-icon">⌁</span><h3>Loading signals</h3><p>Reading persisted signal decisions.</p></div></td></tr></tbody></table></div></section><dialog id="signalDialog"><div class="dialog-head"><span class="eyebrow">SIGNAL DETAILS</span><h2 id="signalDialogTitle">Signal</h2></div><pre id="signalDialogBody"></pre><div class="dialog-actions"><button class="button secondary" id="closeSignalDialog">Close</button></div></dialog></section>
 <section id="trades" class="page" hidden><section class="card history-card"><div class="card-head"><div><h2>Paper trade history</h2><p>Execution details and outcomes after costs</p></div><span class="badge">Unavailable</span></div><div class="table-scroll"><table><thead><tr><th>Instrument</th><th>Entry / exit</th><th>Setup</th><th>Signal link</th><th>Costs</th><th>Net P&amp;L</th><th>Exit reason</th></tr></thead><tbody><tr><td colspan="7"><div class="table-empty"><span class="empty-icon">⇄</span><h3>Trade history unavailable</h3><p>No paper-trade history API is available. Broker order history does not represent this system’s simulated trades.</p></div></td></tr></tbody></table></div></section></section>
-<section id="analytics" class="page" hidden><section class="card history-card"><div class="card-head"><div><h2>Analytics</h2><p id="analyticsSubtitle">Paper performance calculated from stored trades</p></div><span class="badge" id="analyticsQuality">Unavailable</span></div><div class="history-filters analytics-filters"><label>From <input type="date" id="analyticsFrom"></label><label>To <input type="date" id="analyticsTo"></label><div class="preset-chips"><button data-range="today">Today</button><button data-range="7">7 days</button><button data-range="30">30 days</button><button data-range="all">All</button></div><button class="button secondary" id="analyticsFilterBtn">Apply</button><span id="analyticsFilterError" class="filter-error" hidden></span></div><div class="analytics-grid"><div><span>NET P&amp;L</span><b id="analyticsNet">Unavailable</b></div><div><span>WIN RATE</span><b id="analyticsWinRate">Unavailable</b></div><div><span>BROKERAGE</span><b id="analyticsBrokerage">Unavailable</b></div><div><span>SAMPLE SIZE</span><b id="analyticsSample">Unavailable</b></div></div><div class="analytics-grid analytics-extra"><div><span>GROSS</span><b id="analyticsGross">Unavailable</b></div><div><span>FEES % GROSS PROFIT</span><b id="analyticsFeeDrag">Unavailable</b></div><div><span>EXPECTANCY / TRADE</span><b id="analyticsExpectancy">Unavailable</b></div><div><span>PROFIT FACTOR</span><b id="analyticsProfitFactor">Unavailable</b></div></div><div class="analytics-columns"><div class="analytics-summary"><h3>Exit reasons</h3><div id="analyticsExitReasons">Unavailable</div></div><div class="analytics-summary"><h3>Entry hour (IST)</h3><div id="analyticsHours">Unavailable</div></div><div class="analytics-summary"><h3>CALL vs PUT</h3><div id="analyticsDirections">Unavailable</div></div></div><div class="analytics-summary"><h3>Equity curve / drawdown</h3><div id="analyticsCurve">Unavailable</div></div><p id="analyticsWarning">Data-quality warnings are shown when fields are unavailable.</p></section></section>
+<section id="analytics" class="page" hidden>
+  <section class="card history-card">
+    <div class="card-head">
+      <div>
+        <h2>Analytics</h2>
+        <p id="analyticsSubtitle">Paper performance calculated from stored trades</p>
+      </div>
+      <span class="badge" id="analyticsQuality">Unavailable</span>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="history-filters analytics-filters">
+      <label>From <input type="date" id="analyticsFrom"></label>
+      <label>To <input type="date" id="analyticsTo"></label>
+      <div class="preset-chips">
+        <button data-range="today">Today</button>
+        <button data-range="7">7 days</button>
+        <button data-range="30">30 days</button>
+        <button data-range="all">All</button>
+      </div>
+      <button class="button secondary" id="analyticsFilterBtn">Apply</button>
+      <span id="analyticsFilterError" class="filter-error" hidden></span>
+    </div>
+
+    <!-- KPI rows: 8 cards in two rows of 4 -->
+    <div class="an-kpi-grid">
+      <div class="an-kpi-card">
+        <span class="an-kpi-label">NET P&amp;L</span>
+        <b class="an-kpi-value" id="analyticsNet">—</b>
+      </div>
+      <div class="an-kpi-card">
+        <span class="an-kpi-label">WIN RATE</span>
+        <b class="an-kpi-value" id="analyticsWinRate">—</b>
+      </div>
+      <div class="an-kpi-card">
+        <span class="an-kpi-label">BROKERAGE</span>
+        <b class="an-kpi-value" id="analyticsBrokerage">—</b>
+      </div>
+      <div class="an-kpi-card">
+        <span class="an-kpi-label">SAMPLE SIZE</span>
+        <b class="an-kpi-value" id="analyticsSample">—</b>
+      </div>
+      <div class="an-kpi-card an-kpi-dim">
+        <span class="an-kpi-label">GROSS P&amp;L</span>
+        <b class="an-kpi-value" id="analyticsGross">—</b>
+      </div>
+      <div class="an-kpi-card an-kpi-dim">
+        <span class="an-kpi-label">FEES % GROSS</span>
+        <b class="an-kpi-value" id="analyticsFeeDrag">—</b>
+      </div>
+      <div class="an-kpi-card an-kpi-dim">
+        <span class="an-kpi-label">EXPECTANCY / TRADE</span>
+        <b class="an-kpi-value" id="analyticsExpectancy">—</b>
+      </div>
+      <div class="an-kpi-card an-kpi-dim">
+        <span class="an-kpi-label">PROFIT FACTOR</span>
+        <b class="an-kpi-value" id="analyticsProfitFactor">—</b>
+      </div>
+    </div>
+
+    <!-- Equity Curve -->
+    <div class="an-chart-card">
+      <div class="an-chart-head">
+        <h3 class="an-chart-title">Equity Curve</h3>
+        <span class="badge">Cumulative Net P&amp;L</span>
+      </div>
+      <div class="an-chart-body">
+        <canvas id="equityCurveChart" height="110"></canvas>
+        <p id="equityCurvePlaceholder" class="an-placeholder">No equity data available for this period.</p>
+      </div>
+    </div>
+
+    <!-- Two-column: Exit Reasons + Entry Hours -->
+    <div class="an-two-col">
+      <div class="an-chart-card">
+        <div class="an-chart-head">
+          <h3 class="an-chart-title">Exit Reasons</h3>
+          <span class="badge">by count</span>
+        </div>
+        <div class="an-donut-wrap">
+          <canvas id="exitReasonsChart"></canvas>
+          <p id="exitReasonsPlaceholder" class="an-placeholder">No exit reason data.</p>
+        </div>
+        <div id="analyticsExitReasonsTable"></div>
+      </div>
+      <div class="an-chart-card">
+        <div class="an-chart-head">
+          <h3 class="an-chart-title">Entry Hour (IST)</h3>
+          <span class="badge">trades per hour</span>
+        </div>
+        <div class="an-chart-body">
+          <canvas id="entryHoursChart" height="180"></canvas>
+          <p id="entryHoursPlaceholder" class="an-placeholder">No hour distribution data.</p>
+        </div>
+        <div id="analyticsHoursTable"></div>
+      </div>
+    </div>
+
+    <!-- CALL vs PUT -->
+    <div class="an-chart-card">
+      <div class="an-chart-head">
+        <h3 class="an-chart-title">CALL vs PUT Breakdown</h3>
+        <span class="badge">by direction</span>
+      </div>
+      <div id="analyticsDirectionsContent">
+        <p id="analyticsDirectionsPlaceholder" class="an-placeholder">No direction breakdown data.</p>
+      </div>
+    </div>
+
+    <p id="analyticsWarning" class="an-warning"></p>
+
+    <!-- Hidden data carriers -->
+    <div id="analyticsExitReasons" hidden></div>
+    <div id="analyticsHours" hidden></div>
+    <div id="analyticsDirections" hidden></div>
+    <div id="analyticsCurve" hidden></div>
+  </section>
+</section>
+
 <footer class="page-footer"><span>Algo execution service</span><span id="updatedAt">Status not yet verified</span></footer></main></div></div>
 <dialog id="confirmDialog"><div class="dialog-head"><span class="eyebrow">SESSION CONTROL</span><h2 id="confirmTitle"></h2></div><p id="confirmText"></p><div class="dialog-actions"><button class="button secondary" id="cancelConfirm">Cancel</button><button class="button primary" id="confirmAction">Confirm</button></div></dialog>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="/trading-dashboard.js"></script></body></html>
