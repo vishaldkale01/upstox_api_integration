@@ -1,0 +1,113 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start App with Debug",
+      "type": "shell",
+      "command": "node",
+      "args": ["--inspect=9229", "app.js"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test Trailing Stop Logic",
+      "type": "shell",
+      "command": "node",
+      "args": ["debug/trail-stop-debug.js"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "npm",
+      "args": ["install"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run App (Development)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyze Trading Code",
+      "type": "shell",
+      "command": "node",
+      "args": ["-e", "console.log('Analyzing trailing stop implementation...'); const fs = require('fs'); const content = fs.readFileSync('./services/anylyser/analyzeTrend.js', 'utf8'); const trailLines = content.split('\\n').map((line, i) => ({line: i+1, text: line})).filter(l => l.text.toLowerCase().includes('trail')); console.log('Lines containing \"trail\":', trailLines.length); trailLines.forEach(l => console.log(`Line ${l.line}: ${l.text.trim()}`));"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Check Trading Dependencies", 
+      "type": "shell",
+      "command": "node",
+      "args": ["-e", "const pkg = require('./package.json'); console.log('Trading-related dependencies:'); Object.keys(pkg.dependencies).filter(dep => ['upstox', 'mongoose', 'ws', 'axios', 'protobuf'].some(trading => dep.includes(trading))).forEach(dep => console.log(`- ${dep}: ${pkg.dependencies[dep]}`));"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

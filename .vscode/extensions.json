@@ -1,0 +1,22 @@
+{
+  "recommendations": [
+    "ms-vscode.vscode-node-azure-pack",
+    "ms-vscode.js-debug-nightly",
+    "ms-vscode.vscode-typescript-next",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-eslint",
+    "ms-vscode.vscode-js-profile-table",
+    "mongodb.mongodb-vscode",
+    "ms-python.python",
+    "formulahendry.code-runner",
+    "ms-vscode.hexeditor",
+    "ms-vscode.remote-containers",
+    "ms-vscode.remote-ssh",
+    "github.copilot",
+    "github.copilot-chat",
+    "ms-vscode.vscode-github-issue-notebooks"
+  ]
+}

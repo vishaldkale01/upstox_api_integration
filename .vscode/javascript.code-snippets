@@ -1,0 +1,139 @@
+{
+  "Trailing Stop CALL Trade": {
+    "prefix": "tril-call",
+    "body": [
+      "// Trailing stop logic for CALL trade",
+      "if (trade.tradeType === 'CALL' && currentPrice > trade.entryPrice) {",
+      "    const trailStop = ${1:0.1}; // ${1:0.1}% trailing stop",
+      "    const newStop = currentPrice * (1 - trailStop / 100);",
+      "    if (newStop > trade.stopLoss) {",
+      "        trade.stopLoss = newStop;",
+      "        console.log(`Updated trailing stop for ${trade.symbol} CALL to ${newStop}`);",
+      "    }",
+      "}"
+    ],
+    "description": "Creates trailing stop logic for CALL trade"
+  },
+  "Trailing Stop PUT Trade": {
+    "prefix": "tril-put",
+    "body": [
+      "// Trailing stop logic for PUT trade",
+      "if (trade.tradeType === 'PUT' && currentPrice < trade.entryPrice) {",
+      "    const trailStop = ${1:0.1}; // ${1:0.1}% trailing stop",
+      "    const newStop = currentPrice * (1 + trailStop / 100);",
+      "    if (newStop < trade.stopLoss) {",
+      "        trade.stopLoss = newStop;",
+      "        console.log(`Updated trailing stop for ${trade.symbol} PUT to ${newStop}`);",
+      "    }",
+      "}"
+    ],
+    "description": "Creates trailing stop logic for PUT trade"
+  },
+  "Dynamic Trailing Stop": {
+    "prefix": "tril-dynamic",
+    "body": [
+      "// Dynamic trailing stop based on velocity",
+      "const trailStop = Math.abs(signals.velocity) > 1 ",
+      "    ? ${1:SCALPING_CONFIG.trailStopPercent} * 1.5 ",
+      "    : ${1:SCALPING_CONFIG.trailStopPercent};",
+      "",
+      "console.log(`Dynamic trail stop: ${trailStop}% (velocity: ${signals.velocity})`);",
+      "",
+      "// Apply dynamic trailing stop",
+      "if (trade.tradeType === '${2:CALL}') {",
+      "    const newStop = currentPrice * (1 - trailStop);",
+      "    if (newStop > trade.stopLoss) {",
+      "        trade.stopLoss = newStop;",
+      "        await trade.save();",
+      "    }",
+      "}"
+    ],
+    "description": "Creates dynamic trailing stop based on price velocity"
+  },
+  "Trailing Stop Exit Condition": {
+    "prefix": "tril-exit",
+    "body": [
+      "// Check trailing stop exit condition",
+      "const trailStopHit = (",
+      "    (trade.tradeType === 'CALL' && currentPrice <= trade.stopLoss) ||",
+      "    (trade.tradeType === 'PUT' && currentPrice >= trade.stopLoss)",
+      ");",
+      "",
+      "if (trailStopHit) {",
+      "    trade.status = 'CLOSED';",
+      "    trade.exitPrice = currentPrice;",
+      "    trade.exitTime = new Date();",
+      "    trade.exitReason = 'TRAILING_STOP';",
+      "    trade.pnl = trade.tradeType === 'CALL'",
+      "        ? (currentPrice - trade.entryPrice) * trade.quantity",
+      "        : (trade.entryPrice - currentPrice) * trade.quantity;",
+      "    ",
+      "    await trade.save();",
+      "    console.log(`Trailing stop exit: ${trade.symbol} PnL: ${trade.pnl}`);",
+      "}"
+    ],
+    "description": "Creates trailing stop exit condition check"
+  },
+  "Scalping Config with Trailing Stop": {
+    "prefix": "scalp-config",
+    "body": [
+      "const SCALPING_CONFIG = {",
+      "    targetPercent: ${1:0.3},     // ${1:0.3}% target",
+      "    stopLossPercent: ${2:0.2},   // ${2:0.2}% stop loss", 
+      "    trailStopPercent: ${3:0.1},  // ${3:0.1}% trailing stop",
+      "    minVolumeRatio: ${4:0.8},    // Minimum volume ratio",
+      "    minConfidence: ${5:40},      // Minimum confidence threshold",
+      "    minCandles: {",
+      "        oneMin: ${6:5},          // Minimum 1-minute candles",
+      "        thirtyMin: ${7:3}        // Minimum 30-minute candles",
+      "    }",
+      "};"
+    ],
+    "description": "Creates scalping configuration with trailing stop settings"
+  },
+  "Debug Trailing Stop": {
+    "prefix": "debug-tril",
+    "body": [
+      "// Debug trailing stop calculation",
+      "console.log('=== Trailing Stop Debug ===');",
+      "console.log('Symbol:', trade.symbol);",
+      "console.log('Trade Type:', trade.tradeType);",
+      "console.log('Entry Price:', trade.entryPrice);",
+      "console.log('Current Price:', currentPrice);",
+      "console.log('Current Stop Loss:', trade.stopLoss);",
+      "console.log('Trail Stop %:', trailStop);",
+      "",
+      "if (trade.tradeType === 'CALL') {",
+      "    const calculatedStop = currentPrice * (1 - trailStop);",
+      "    console.log('Calculated Stop:', calculatedStop);",
+      "    console.log('Should Update:', calculatedStop > trade.stopLoss);",
+      "} else {",
+      "    const calculatedStop = currentPrice * (1 + trailStop);",
+      "    console.log('Calculated Stop:', calculatedStop);",
+      "    console.log('Should Update:', calculatedStop < trade.stopLoss);",
+      "}",
+      "console.log('=========================');"
+    ],
+    "description": "Creates debug output for trailing stop calculations"
+  },
+  "Mock Trade for Testing": {
+    "prefix": "mock-trade",
+    "body": [
+      "// Mock trade for testing trailing stop",
+      "const mockTrade = {",
+      "    symbol: '${1:NIFTY50}',",
+      "    tradeType: '${2:CALL}',",
+      "    entryPrice: ${3:45000},",
+      "    targetPrice: ${4:45135},",
+      "    stopLoss: ${5:44910},",
+      "    quantity: ${6:1},",
+      "    status: 'OPEN',",
+      "    async save() {",
+      "        console.log('Mock trade updated:', this);",
+      "        return this;",
+      "    }",
+      "};"
+    ],
+    "description": "Creates a mock trade object for testing trailing stop logic"
+  }
+}
