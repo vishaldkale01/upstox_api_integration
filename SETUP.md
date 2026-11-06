@@ -35,6 +35,8 @@ On Windows use `Copy-Item .env.example .env`. Edit the resulting file:
 | `ALLOWED_UPSTOX_USER_IDS` | Your actual Upstox account ID; comma-separate additional authorized accounts |
 | `TRUST_PROXY` | `0` locally; `1` only behind exactly one trusted reverse proxy |
 
+The gateway uses Redis RESP2 for compatibility with Redis servers that do not support RESP3's `HELLO` command.
+
 Generate each secret separately:
 
 ```bash
