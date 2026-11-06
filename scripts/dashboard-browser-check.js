@@ -8,7 +8,7 @@ let active = false;
 let starts = 0;
 let stops = 0;
 const server = http.createServer((req, res) => {
-  console.log('request', req.method, req.url);
+  if (req.url === '/auth/session') return reply(res, { user: { id: 'DEV0', name: 'Test account' }, csrfToken: 'test-csrf' });
   if (req.url === '/control-panel/config') {
     return reply(res, { strategy_version: 'strategy-v2026.10.15', defaults: { capital: 100000, lots: 1, target_symbol: 'NSE_INDEX|Nifty Bank', risk_per_trade: 0.02, max_daily_loss: 0.05, RECORDER_OUTPUT_PATH: 'data/market_data' }, risk_engine: { enabled: true, max_risk_per_trade: 0.02, max_daily_loss: 0.05 }, frozen_strategy: { setups: ['MOMENTUM_ENTRY'] } });
   }
@@ -25,13 +25,14 @@ const server = http.createServer((req, res) => {
 });
 function reply(res, value) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)); }
 
+let browser;
 (async () => {
   await new Promise((resolve) => server.listen(0, resolve));
-  const browser = await chromium.launch({ headless: true, executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' });
+  browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
   const page = await browser.newPage();
   page.on('console', (message) => console.log('browser:', message.type(), message.text()));
   page.on('pageerror', (error) => console.log('pageerror:', error.message));
-  await page.goto(`http://127.0.0.1:${server.address().port}/trading-dashboard.html?user_id=DEV0&access_token=test-token`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+  await page.goto(`http://127.0.0.1:${server.address().port}/trading-dashboard.html`, { waitUntil: 'domcontentloaded', timeout: 10000 });
   console.log('loaded');
   await page.waitForFunction(() => document.querySelector('#strategyVersion')?.textContent === 'strategy-v2026.10.15', null, { timeout: 5000 });
   console.log('config loaded');
@@ -56,8 +57,8 @@ function reply(res, value) { res.writeHead(200, { 'Content-Type': 'application/j
   await page.waitForFunction(() => document.querySelector('#sessionState')?.textContent === 'Running');
   await page.getByText('Stop session', { exact: true }).click();
   await page.getByRole('dialog').getByText('Confirm', { exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('#sessionState')?.textContent === 'Stopped');
+  await page.waitForFunction(() => ['Standby', 'Closed'].includes(document.querySelector('#sessionState')?.textContent));
   if (starts !== 1 || stops !== 1) throw new Error(`unexpected API calls: starts=${starts}, stops=${stops}`);
   console.log('dashboard browser smoke: PASS');
   await browser.close(); server.close();
-})().catch((error) => { console.error(error.stack || error); server.close(); process.exitCode = 1; });
+})().catch(async (error) => { console.error(error.stack || error); if (browser) await browser.close(); server.close(); process.exitCode = 1; });

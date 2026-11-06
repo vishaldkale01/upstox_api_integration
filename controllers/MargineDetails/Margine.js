@@ -11,7 +11,7 @@ const axios = require('axios');
 const url = 'https://api.upstox.com/v2/charges/margin';
 const headers = {
   'accept': 'application/json',
-  'Authorization': `Bearer ${access_token}`,
+  'Authorization': `Bearer ${req.session.brokerAccessToken}`,
   'Content-Type': 'application/json'
 };
 // const data = {
@@ -43,19 +43,19 @@ const headers = {
 const url = 'https://api.upstox.com/v2/charges/margin';
 const headers = {
   'accept': 'application/json',
-  'Authorization': `Bearer ${access_token}`,
+  'Authorization': `Bearer ${req.session.brokerAccessToken}`,
   'Content-Type': 'application/json'
 };
 const data = req.body.instruments
 
 axios.post(url, data, { headers })
   .then(response => {
-    console.log(response.status);
-    console.log(response.data);
+
+
     sendSuccess(res , response.data)
   })
   .catch(error => {
-    console.error(error)
+
     sendError(res , "Margin Details" ,error , error)
 });
 } catch (error) {

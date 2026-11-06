@@ -3,7 +3,7 @@
 
   const $ = (id) => document.getElementById(id);
   const state = { user: null, config: {}, status: null, pendingAction: null, statusRefreshInFlight: false, snapshotRefreshInFlight: false, refreshTimer: null, charts: {} };
-  const api = (path, options) => fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
+  const api = (path, options = {}) => fetch(path, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrfToken || '', ...options.headers } });
   function applyTheme(theme) {
     const selected = ['blue', 'dark', 'black'].includes(theme) ? theme : 'light';
     document.body.classList.remove('theme-blue', 'theme-dark', 'theme-black');
@@ -14,17 +14,18 @@
     if (!$('analytics').hidden) loadAnalytics();
   }
 
-  function readUser() {
-    const query = new URLSearchParams(location.search);
-    let saved = {};
-    try { saved = JSON.parse(sessionStorage.getItem('userSession') || '{}'); } catch (_) {}
-    state.user = {
-      id: query.get('user_id') || saved.user_id || saved.userId || 'DEV0',
-      name: saved.name || saved.user_name || 'Trading account',
-      token: query.get('access_token') || saved.access_token || saved.accessToken || ''
-    };
+  async function readUser() {
+    // Remove legacy browser tokens and token-bearing URLs during migration.
+    sessionStorage.removeItem('userSession');
+    history.replaceState(null, '', location.pathname);
+    const response = await api('/auth/session');
+    if (!response.ok) { location.replace('/login'); return false; }
+    const data = await response.json();
+    state.user = data.user;
+    state.csrfToken = data.csrfToken;
     $('userName').firstChild.textContent = state.user.name;
     $('userId').textContent = state.user.id;
+    return true;
   }
 
   function setText(id, value) { const node = $(id); if (node) node.textContent = value == null || value === '' ? 'Unavailable' : String(value); }
@@ -49,7 +50,7 @@
   function collectForm() {
     const value = (id) => $(id)?.value;
     const checked = (id) => Boolean($(id)?.checked);
-    return { user_id: state.user.id, access_token: state.user.token, capital: Number(value('capital')), trade_mode: 'PAPER', target_symbol: value('targetSymbol'), lots: Number(value('lots')), risk_per_trade: Number(value('riskPerTrade')) / 100, max_daily_loss: Number(value('maxDailyLoss')) / 100, sl_cooldown_minutes: Number(value('slCooldown')), direction_flip_cooldown_minutes: Number(value('flipCooldown')), post_exit_cooldown_minutes: Number(value('exitCooldown')), ENABLE_DYNAMIC_COOLDOWN: checked('dynamicCooldown'), USE_AI_VALIDATION: checked('aiValidation'), DEBUG_MODE: checked('debugMode'), ENABLE_DEPTH_GATING: checked('depthGating'), REQUIRE_DEPTH_TO_ENTER: checked('requireDepth'), MIN_DEPTH_QTY: Number(value('minDepth')), MAX_SPREAD_WIDTH: Number(value('maxSpread')), ENABLE_OFI_DEPTH_GATING: checked('ofiGating'), MAX_DEPTH_IMBALANCE_RATIO: Number(value('maxImbalance')), ENABLE_L2_DUAL_GUARD: checked('l2Guard'), MAX_L2_SPREAD: Number(value('maxL2Spread')), MIN_L2_BID_IMBALANCE: Number(value('minBidImbalance')), ENABLE_MARKET_DATA_RECORDER: checked('recorderEnabled'), RECORDER_OUTPUT_PATH: value('recorderPath'), RECORDER_BUFFER_SIZE: Number(value('bufferSize')), RECORDER_FLUSH_INTERVAL_SEC: Number(value('flushInterval')), RECORDER_FLUSH_BATCH_SIZE: Number(value('flushBatch')), RECORDER_MIN_DISK_FREE_GB: Number(value('minDisk')), RECORDER_MAX_RECOVERY_ATTEMPTS: Number(value('recoveryAttempts')), WATCHDOG_INTERVAL_SEC: Number(value('watchdogInterval')), TICK_GAP_THRESHOLD_SEC: Number(value('tickGap')), EVAL_GAP_THRESHOLD_SEC: Number(value('evalGap')) };
+    return { user_id: state.user.id, capital: Number(value('capital')), trade_mode: 'PAPER', target_symbol: value('targetSymbol'), lots: Number(value('lots')), risk_per_trade: Number(value('riskPerTrade')) / 100, max_daily_loss: Number(value('maxDailyLoss')) / 100, sl_cooldown_minutes: Number(value('slCooldown')), direction_flip_cooldown_minutes: Number(value('flipCooldown')), post_exit_cooldown_minutes: Number(value('exitCooldown')), ENABLE_DYNAMIC_COOLDOWN: checked('dynamicCooldown'), USE_AI_VALIDATION: checked('aiValidation'), DEBUG_MODE: checked('debugMode'), ENABLE_DEPTH_GATING: checked('depthGating'), REQUIRE_DEPTH_TO_ENTER: checked('requireDepth'), MIN_DEPTH_QTY: Number(value('minDepth')), MAX_SPREAD_WIDTH: Number(value('maxSpread')), ENABLE_OFI_DEPTH_GATING: checked('ofiGating'), MAX_DEPTH_IMBALANCE_RATIO: Number(value('maxImbalance')), ENABLE_L2_DUAL_GUARD: checked('l2Guard'), MAX_L2_SPREAD: Number(value('maxL2Spread')), MIN_L2_BID_IMBALANCE: Number(value('minBidImbalance')), ENABLE_MARKET_DATA_RECORDER: checked('recorderEnabled'), RECORDER_OUTPUT_PATH: value('recorderPath'), RECORDER_BUFFER_SIZE: Number(value('bufferSize')), RECORDER_FLUSH_INTERVAL_SEC: Number(value('flushInterval')), RECORDER_FLUSH_BATCH_SIZE: Number(value('flushBatch')), RECORDER_MIN_DISK_FREE_GB: Number(value('minDisk')), RECORDER_MAX_RECOVERY_ATTEMPTS: Number(value('recoveryAttempts')), WATCHDOG_INTERVAL_SEC: Number(value('watchdogInterval')), TICK_GAP_THRESHOLD_SEC: Number(value('tickGap')), EVAL_GAP_THRESHOLD_SEC: Number(value('evalGap')) };
   }
 
   function validate(payload) {
@@ -733,9 +734,9 @@
   }
 
   function openConfirm(action) { state.pendingAction = action; $('confirmTitle').textContent = action === 'start' ? 'Start paper session?' : 'Stop paper session?'; $('confirmText').textContent = action === 'start' ? 'The approved configuration will be sent to the paper execution service.' : 'Stop the active paper session and keep its recording available for review.'; $('confirmDialog').showModal(); }
-  async function confirmAction() { const action = state.pendingAction; $('confirmDialog').close(); try { if (action === 'start') { const p = collectForm(); if (!state.user.token) return showMessage('An access token is required to start a session.', 'error'); const r = await api('/start-trading', { method: 'POST', body: JSON.stringify(p) }); if (!r.ok) throw new Error(await r.text()); showMessage('Paper session start requested.', 'ok'); } else { const r = await api('/stop-trading', { method: 'POST', body: JSON.stringify({ user_id: state.user.id, access_token: state.user.token }) }); if (!r.ok) throw new Error(await r.text()); showMessage('Paper session stop requested.', 'ok'); } await refreshStatus(); } catch (e) { showMessage(e.message || 'Request failed.', 'error'); } }
+  async function confirmAction() { const action = state.pendingAction; $('confirmDialog').close(); try { if (action === 'start') { const p = collectForm(); const r = await api('/start-trading', { method: 'POST', body: JSON.stringify(p) }); if (!r.ok) throw new Error(await r.text()); showMessage('Paper session start requested.', 'ok'); } else { const r = await api('/stop-trading', { method: 'POST', body: JSON.stringify({ user_id: state.user.id }) }); if (!r.ok) throw new Error(await r.text()); showMessage('Paper session stop requested.', 'ok'); } await refreshStatus(); } catch (e) { showMessage(e.message || 'Request failed.', 'error'); } }
 
   async function loadConfig() { try { const r = await api('/control-panel/config'); if (!r.ok) throw new Error(); state.config = await r.json(); applyDefaults(state.config.defaults); setText('strategyVersion', state.config.strategy_version); setText('strategyFlags', state.config.frozen_strategy?.setups?.join(' · ')); renderReview(); } catch (_) { showMessage('Configuration metadata unavailable; backend defaults were not loaded.', 'error'); renderReview(); } }
-  document.addEventListener('DOMContentLoaded', () => { readUser(); document.querySelectorAll('[data-page]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.page))); document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go))); $('configureBtn').addEventListener('click', () => navigate('configuration')); $('refreshBtn').addEventListener('click', () => { refreshStatus(); refreshMarketSnapshot(); loadConfig(); }); $('stopBtn').addEventListener('click', () => openConfirm('stop')); $('startBtn').addEventListener('click', () => openConfirm('start')); $('cancelConfirm').addEventListener('click', () => $('confirmDialog').close()); $('confirmAction').addEventListener('click', confirmAction); $('logoutBtn').addEventListener('click', () => { if (state.status?.active) return showMessage('Stop the active paper session before signing out.', 'error'); location.href = '/login'; }); $('configForm').addEventListener('input', renderReview); $('signalFilterBtn').addEventListener('click', loadSignals); $('closeSignalDialog').addEventListener('click', () => $('signalDialog').close()); navigate('overview'); loadConfig().then(() => { refreshStatus(); refreshMarketSnapshot(); }); });
+  document.addEventListener('DOMContentLoaded', async () => { if (!await readUser()) return; document.querySelectorAll('[data-page]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.page))); document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go))); $('configureBtn').addEventListener('click', () => navigate('configuration')); $('refreshBtn').addEventListener('click', () => { refreshStatus(); refreshMarketSnapshot(); loadConfig(); }); $('stopBtn').addEventListener('click', () => openConfirm('stop')); $('startBtn').addEventListener('click', () => openConfirm('start')); $('cancelConfirm').addEventListener('click', () => $('confirmDialog').close()); $('confirmAction').addEventListener('click', confirmAction); $('logoutBtn').addEventListener('click', async () => { if (state.status?.active) return showMessage('Stop the active paper session before signing out.', 'error'); const response = await api('/logout', { method: 'POST' }); if (response.ok) location.href = '/login'; else showMessage('Sign out failed. Try again.', 'error'); }); $('configForm').addEventListener('input', renderReview); $('signalFilterBtn').addEventListener('click', loadSignals); $('closeSignalDialog').addEventListener('click', () => $('signalDialog').close()); navigate('overview'); loadConfig().then(() => { refreshStatus(); refreshMarketSnapshot(); }); });
   document.addEventListener('DOMContentLoaded', () => { applyTheme(localStorage.getItem('dashboardTheme') || 'light'); $('themeSelect')?.addEventListener('change', (event) => applyTheme(event.target.value)); document.querySelectorAll('[data-page]').forEach((button) => button.addEventListener('click', () => { document.body.dataset.page = button.dataset.page; })); $('analyticsFilterBtn')?.addEventListener('click', loadAnalytics); document.querySelectorAll('[data-range]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-range]').forEach((chip) => chip.classList.remove('active')); button.classList.add('active'); const today = new Date(); const iso = (d) => d.toISOString().slice(0, 10); const kind = button.dataset.range; if (kind === 'all') { $('analyticsFrom').value = ''; $('analyticsTo').value = ''; } else { const from = new Date(today); if (kind === '7') from.setDate(today.getDate() - 6); if (kind === '30') from.setDate(today.getDate() - 29); $('analyticsFrom').value = iso(from); $('analyticsTo').value = iso(today); } loadAnalytics(); })); });
 }());

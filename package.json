@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js",
-     "test": "echo 'Running tests...' && exit 0" 
+    "dev": "node --watch app.js",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node scripts/dashboard-browser-check.js"
   },
   "keywords": [],
   "author": "",
@@ -14,13 +15,21 @@
   "dependencies": {
     "axios": "^1.7.2",
     "body-parser": "^1.20.2",
+    "connect-redis": "^10.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-session": "^1.19.0",
     "mongoose": "^8.5.1",
     "morgan": "^1.10.0",
     "protobufjs": "^7.4.0",
-    "upstox": "^2.0.0",
+    "redis": "^6.3.1",
     "upstox-js-sdk": "^2.21.0",
     "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

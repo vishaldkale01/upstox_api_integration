@@ -1,7 +1,7 @@
 // controllers/trading/trading.js - DIRECT PROXY TO PYTHON
 // This version proxies all requests directly to Python backend at http://127.0.0.1:8000
 
-const axios = require('axios');
+const axios = require('axios').create({ headers: { 'X-Engine-Token': process.env.ENGINE_API_TOKEN } });
 
 // Configuration
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000';
@@ -172,7 +172,7 @@ async function getOfflineSessionStatus(user_id) {
                 };
             }
         } catch (dbErr) {
-            console.warn('[Trading] Could not fetch offline status from MongoDB:', dbErr.message);
+            console.warn('[Trading] Offline status unavailable');
         }
     }
 
@@ -212,7 +212,7 @@ async function getOfflineSessionStatus(user_id) {
 // Start/stop are explicit proxies to the Python execution service. Keep the
 // Node layer from inventing a local session when the execution service is down.
 const startTrading = async (req, res) => {
-    const body = req.body || {};
+    const body = { ...req.body, user_id: req.session.user.id, access_token: req.session.brokerAccessToken };
     if (!body.user_id) return res.status(400).json({ success: false, message: 'user_id is required' });
     try {
         const response = await axios.post(`${PYTHON_BACKEND_URL}/start-trading`, body, { timeout: 30000 });
@@ -222,13 +222,13 @@ const startTrading = async (req, res) => {
         return res.status(status).json({
             success: false,
             message: 'Unable to start trading session through Python execution service',
-            error: error.response?.data?.detail || error.message
+            error: 'Execution service request failed'
         });
     }
 };
 
 const stopTrading = async (req, res) => {
-    const body = req.body || {};
+    const body = { ...req.body, user_id: req.session.user.id, access_token: req.session.brokerAccessToken };
     const userId = body.user_id || req.query.user_id;
     if (!userId) return res.status(400).json({ success: false, message: 'user_id is required' });
     try {
@@ -239,7 +239,7 @@ const stopTrading = async (req, res) => {
         return res.status(status).json({
             success: false,
             message: 'Unable to stop trading session through Python execution service',
-            error: error.response?.data?.detail || error.message
+            error: 'Execution service request failed'
         });
     }
 };
@@ -269,11 +269,11 @@ const getSessionStatus = async (req, res) => {
         }
 
     } catch (error) {
-        console.error('[Trading] Error getting session status:', error);
+        console.error('[Trading] Status request failed');
         res.status(500).json({
             success: false,
             message: 'Error getting session status',
-            error: error.message
+            error: 'Request failed'
         });
     }
 };
@@ -315,7 +315,7 @@ const getMarketSnapshot = async (req, res) => {
                     });
                 }
             } catch (dbErr) {
-                console.warn('[Trading] Could not fetch market snapshot from MongoDB:', dbErr.message);
+                console.warn('[Trading] Market snapshot unavailable');
             }
         }
         return res.status(200).json({
@@ -375,51 +375,17 @@ const getUserSessions = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[Trading] Error getting user sessions:', error);
+        console.error('[Trading] Session request failed');
         res.status(500).json({
             success: false,
             message: 'Error getting user sessions',
-            error: error.message
+            error: 'Request failed'
         });
     }
 };
 
 // Get trading dashboard page
-const getTradingDashboard = (req, res) => {
-    try {
-        const { userId, userName, email, userType, exchanges, accessToken } = req.query;
-
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <script>
-                    const userSession = {
-                        userId: '${userId || 'DEV0'}',
-                        userName: '${userName || 'User'}',
-                        email: '${email || ''}',
-                        userType: '${userType || ''}',
-                        exchanges: '${exchanges || ''}',
-                        accessToken: '${accessToken || ''}'
-                    };
-                    sessionStorage.setItem('userSession', JSON.stringify(userSession));
-                    window.location.href = '/trading-dashboard.html?' + new URLSearchParams(userSession).toString();
-                </script>
-            </head>
-            <body>
-                <p>Redirecting to trading dashboard...</p>
-            </body>
-            </html>
-        `);
-    } catch (error) {
-        console.error('[Trading] Error loading dashboard:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error loading dashboard',
-            error: error.message
-        });
-    }
-};
+const getTradingDashboard = (_req, res) => res.redirect('/trading-dashboard.html');
 
 module.exports = {
     startTrading,

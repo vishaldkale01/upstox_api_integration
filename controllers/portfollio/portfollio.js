@@ -18,18 +18,18 @@ const getPosition = async ()=>{
 
 const getHolding = async (req , res)=>{
     try {
-let defaultClient = UpstoxClient.ApiClient.instance;
+let defaultClient = new UpstoxClient.ApiClient();
 var OAUTH2 = defaultClient.authentications['OAUTH2'];
-OAUTH2.accessToken = access_token;
+OAUTH2.accessToken = req.session.brokerAccessToken;
 
-let apiInstance = new UpstoxClient.PortfolioApi();
+let apiInstance = new UpstoxClient.PortfolioApi(defaultClient);
 let apiVersion = "2.0";
 apiInstance.getHoldings(apiVersion,(error,data,response)=>{
   if(error) {
     sendError(res , "getHolding" , error.text , error.stack )
 }
 else{
-    console.log("API called=  "  + JSON.stringify(data))
+
     sendSuccess(res , data)
 }
 });
