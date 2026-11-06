@@ -14,6 +14,12 @@ const { getPaperTrades, getPaperSessions, getPaperSignals, getPaperSignal, getPa
 
 router.get('/login', getLoginUrl);
 router.get('/callback', handleCallback);
+const { requireSession, requireOwner, getSession, logout } = require('../security/session');
+router.use(requireSession);
+router.use(requireOwner);
+router.param('user_id', (req, res, next) => requireOwner(req, res, next));
+router.get('/auth/session', getSession);
+router.post('/logout', logout);
 router.get('/trading-dashboard', getTradingDashboard);
 router.post('/start-trading', startTrading);
 router.post('/stop-trading', stopTrading);
@@ -34,11 +40,11 @@ router.get('/charges/brokerage', getBrokerage);
 router.get('/historical-candle/:instrumentKey/:interval/:to_date/:from_date', HistoryCandleData);
 router.get('/historical-candle/intraday/:instrumentKey/:interval', getIntraDayCandleData);
 router.post('/margie', marginDetails);
-router.post('/order/place', placeOrder);
+router.post('/order/place', (_req, res) => res.status(403).json({ message: 'Live orders are disabled on this paper gateway' }));
 router.get('/order/retrieve-all', getOrderBook);
 // portfolio
 router.get('/portfolio/long-term-holdings', getHolding);
-router.put('/order/modify', modifyOrder);
+router.put('/order/modify', (_req, res) => res.status(403).json({ message: 'Live orders are disabled on this paper gateway' }));
 // trades
 router.get('/order/trades/get-trades-for-day', historicalTrades);
 

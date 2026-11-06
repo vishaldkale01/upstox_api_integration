@@ -1,310 +1,55 @@
-# Upstox API Integration in Node.js
+# TradeStack gateway — Upstox API integration
 
-This project integrates the Upstox WebLink API into a Node.js application, providing a comprehensive trading platform with real-time market data, order management, and portfolio tracking capabilities.
+Node.js dashboard and gateway for the Python algorithmic options trading engine.
+It provides Upstox OAuth login, paper-session controls, and MongoDB-backed trade/signal history.
 
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+**Start here: [SETUP.md](SETUP.md).** The companion engine is
+[algo-execution-service](https://github.com/vishaldkale01/algo-execution-service)
+(planned public name: `tradestack-algo-engine`).
 
-## Table of Contents
-- [Features](#features)
-- [Installation](#installation)
-- [Setup](#setup)
-- [MongoDB Setup](#mongodb-setup)
-- [API Endpoints](#api-endpoints)
-- [WebSocket Integration](#websocket-integration)
-- [AI/ML Features](#aiml-features)
-- [Error Handling](#error-handling)
-- [Trading dashboard and paper analytics](#trading-dashboard-and-paper-analytics)
-- [Roadmap](#roadmap)
-- [Development](#development)
-- [License](#license)
-- [Contributing](#contributing)
+## Current behavior
 
-## Features
+- Broker access tokens stay server-side in Redis-backed sessions.
+- The browser receives an HttpOnly session cookie and a CSRF token, never the broker token.
+- Only configured Upstox account IDs can sign in to an installation.
+- History and session requests are restricted to the signed-in account.
+- Gateway-to-engine requests use a separate shared secret.
+- This gateway supports paper trading; direct live order placement/modification routes are disabled.
+- MongoDB stores trade/signal history. Redis stores sessions and supports the Python engine.
+- Market-data recording and replay run in the Python repository.
 
-- **Authentication & Authorization**
-  - OAuth 2.0 integration with Upstox
-  - Secure token management
-  - Session handling
+## Quick installation
 
-- **Trading Operations**
-  - Place, modify, and cancel orders
-  - View order history and trade book
-  - Real-time order status updates
-  - Portfolio management
-
-- **Market Data**
-  - Real-time market quotes via WebSocket
-  - Historical candle data with pattern recognition
-  - OHLC data access
-  - Option chain data
-
-- **Account Management**
-  - User profile management
-  - Fund and margin details
-  - Holdings and positions tracking
-  - Brokerage calculation
-
-- **Advanced Features**
-  - Technical analysis with candlestick pattern recognition
-  - Real-time WebSocket market data feed
-  - Protobuf message encoding/decoding
-  - Sentiment analysis for market news (FinBERT integration)
-
-## Installation
+Requirements: Node.js 22+, MongoDB, Redis, Python engine, and an Upstox developer application.
 
 ```bash
-git clone https://github.com/vishaldkale01/upstox-api-integration.git
-cd upstox-api-integration
-npm install
+git clone https://github.com/vishaldkale01/upstox_api_integration.git
+cd upstox_api_integration
+npm ci
+cp .env.example .env
 ```
 
-## Setup
+Fill in the environment values using [SETUP.md](SETUP.md), start MongoDB, Redis and the Python engine,
+then run `npm start`. Open `http://localhost:3000/login`.
 
-1. Create an Upstox Developer Account and obtain API credentials
-2. Configure environment variables:
+## Verification
 
 ```bash
-# .env file
-UPSTOX_API_KEY=your_api_key
-UPSTOX_API_SECRET=your_api_secret
-UPSTOX_REDIRECT_URI=your_redirect_uri
-MONGO_DB=your_mongodb_uri
-PORT=3000
-```
-
-3. Start the server:
-```bash
-npm start
-```
-
-## MongoDB Setup
-
-### Prerequisites
-- MongoDB server installed and running
-- MongoDB URI for connection
-- Mongoose ODM version 8.5.1 or higher
-
-### Configuration
-
-1. **Environment Variables**
-   Create or update your `.env` file with the MongoDB connection string:
-   ```bash
-   MONGO_DB=mongodb://localhost:27017/your_database_name
-   ```
-
-2. **Connection Options**
-   The application uses the following Mongoose connection options:
-   ```javascript
-   {
-     useNewUrlParser: true
-   }
-   ```
-
-### Implementation Details
-
-#### Connection Management
-The MongoDB connection is automatically established in `loaders/mongodb`:
-- Auto-executing connection function
-- Connection string loaded from environment variables
-- Mongoose as the ODM (Object Document Mapper)
-- Synchronous connection with proper error handling
-
-The connection is established as soon as the module is loaded, ensuring database availability before the application starts:
-
-```javascript
-// Connection is automatically established when the module loads
-mongoConnect();
-```
-
-#### Error Handling
-The application implements robust error handling for MongoDB:
-
-1. **Connection Errors**
-   - Failed connections are logged with detailed error messages
-   - Application exits with status code 1 on connection failure
-   - Error stack traces are preserved for debugging
-
-2. **Global Error Handlers**
-   - Unhandled Promise Rejections
-   - Uncaught Exceptions
-   - Type Errors during execution
-
-#### Logging and Monitoring
-The MongoDB connection includes comprehensive logging:
-
-- **Connection Attempts**: 
-  ```bash
-  "trying to connect with mongo......"
-  ```
-
-- **Success Messages**: 
-  ```bash
-  "Connected successfully to MongoDB"
-  ```
-
-- **Error Messages**:
-  ```bash
-  "Failed to connect to MongoDB" + detailed error information
-  ```
-
-### Integration with Express
-
-The MongoDB connection is automatically established when the application starts:
-
-1. Module loading triggers connection
-2. MongoDB connection establishment
-3. Express server startup
-4. Port binding and listening
-
-This sequence ensures that the database is available before handling any API requests.
-
-### Best Practices
-
-1. **Environment Configuration**
-   - Keep MongoDB URI in environment variables
-   - Never commit credentials to version control
-   - Use different databases for development and production
-
-2. **Error Recovery**
-   - Application fails fast on connection errors
-   - Clear error messages for troubleshooting
-   - Proper cleanup on connection failures
-
-3. **Security**
-   - Use authentication for database access
-   - Configure proper database user permissions
-   - Enable SSL/TLS for production deployments
-
-### Troubleshooting
-
-If you encounter connection issues:
-
-1. Verify MongoDB is running:
-   ```bash
-   mongod --version
-   ```
-
-2. Check connection string format:
-   ```bash
-   mongodb://[username:password@]host[:port]/database
-   ```
-
-3. Ensure network connectivity:
-   - Check MongoDB port accessibility (default: 27017)
-   - Verify firewall settings
-   - Check network configuration
-
-4. Review application logs:
-   - Check for connection errors
-   - Verify environment variables
-   - Monitor MongoDB server logs
-
-## API Endpoints
-
-### Authentication
-- GET `/login` - Initiate Upstox login
-- GET `/callback` - OAuth callback handler
-
-### User & Account
-- GET `/user/profile` - Get user profile
-- GET `/user/get-funds-and-margin` - Get fund and margin details
-
-### Trading
-- POST `/order/place` - Place new order
-- PUT `/order/modify` - Modify existing order
-- GET `/order/retrieve-all` - Get order book
-- GET `/order/trades/get-trades-for-day` - Get day's trades
-
-### Market Data
-- GET `/historical-candle/:instrumentKey/:interval/:to_date/:from_date` - Get historical candles
-- GET `/historical-candle/intraday/:instrumentKey/:interval` - Get intraday data
-- GET `/charges/brokerage` - Calculate brokerage charges
-
-### Portfolio
-- GET `/portfolio/long-term-holdings` - Get holdings
-
-## WebSocket Integration
-
-The application includes real-time market data streaming via WebSocket:
-- Auto-reconnection handling
-- Protobuf message encoding/decoding
-- Support for multiple market data subscriptions
-- Real-time updates for various market data types
-
-## AI/ML Features
-
-### Market News Sentiment Analysis
-- Integration with FinBERT model
-- Real-time sentiment scoring
-- Support for custom confidence thresholds
-- Preprocessing pipeline for financial news
-
-## Error Handling
-
-The application implements comprehensive error handling:
-- Global error handlers for unhandled rejections and exceptions
-- Structured error responses
-- Detailed error logging
-- HTTP status code mapping
-
-## Trading dashboard and paper analytics
-
-The dashboard at `/trading-dashboard.html` provides paper-session controls, signal history, trade history, and date-filtered analytics. Analytics are read-only and use aggregation queries against the `upstox_trading` MongoDB database; no browser request receives raw trade or signal documents.
-
-Available paper-history routes include:
-
-- `GET /paper-sessions?user_id=...` — session summaries and paper P&L.
-- `GET /paper-trades?user_id=...` — closed/open paper trades with linked signal context.
-- `GET /paper-signals?user_id=...` — stored signal decisions with date and setup filters.
-- `GET /paper-signals/:signal_id?user_id=...` — full signal details.
-- `GET /api/analytics?user_id=...&from=YYYY-MM-DD&to=YYYY-MM-DD` — aggregated net P&L, win rate, brokerage, exit reasons, entry hours, direction, strategy versions, and equity data. `/paper-analytics` remains available for compatibility.
-
-Analytics date ranges use IST boundaries. Paper mode remains the only dashboard execution mode; live trading is not enabled by this project.
-
-The browser smoke check can be run with:
-
-```bash
-node scripts/dashboard-browser-check.js
-```
-
-### Current persistence and market-data architecture
-
-MongoDB is currently used for persisted paper-trading history and analytics. The dashboard reads the `trades` and `signals` collections through aggregation-backed read-only routes. Paper trades, linked signals, session identifiers, strategy versions, costs, and net P&L are retained for history and reporting.
-
-Redis is used by the Python execution service for real-time coordination and risk-state support, including cached market/session state and short-lived risk locks. Redis is not used as the dashboard's historical source of truth; MongoDB remains the source for persisted paper history.
-
-### Parquet market-data recordings
-
-The Python service records market ticks and depth data to date-partitioned Parquet datasets under `data/market_data/`. These recordings support deterministic replay and backtesting through the existing replay/backtest scripts. Recording manifests track session identity, timestamps, completeness, and dropped-event information. Incomplete recordings must be excluded from primary performance reports.
-
-Parquet recordings are separate from MongoDB trade and signal persistence: MongoDB stores decisions and outcomes, while Parquet stores the historical market-data stream needed to reproduce them.
-
-## Roadmap
-
-- Broker-verified Live mode with explicit confirmation, order modification, partial-fill handling, and broker-side reconciliation.
-- Additional analytics visualizations and recording-validity integration from the Python service manifests.
-- Further paper-session observation and replay validation before any live execution work.
-
-## Development
-
-```bash
-# Run in development mode with nodemon
-npm run dev
-
-# Run tests
 npm test
+npx playwright install chromium
+npm run test:browser
 ```
+
+The security tests and browser smoke check use test doubles; they do not submit broker orders.
+`npm run dev` uses Node.js built-in watch mode.
+
+## Documentation
+
+- [Setup, environment variables, OAuth, and smoke checks](SETUP.md)
+- [Dashboard guide](TRADING_DASHBOARD_GUIDE.md)
+- [Proxy and authentication boundary](PROXY_SETUP.md)
+- [Installation checklist](INSTALLATION_CHECKLIST.md)
 
 ## License
 
-This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
-
-
+ISC; see [LICENSE](LICENSE). The Python repository has its own licensing status.

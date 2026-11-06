@@ -4,11 +4,11 @@ const axios = require('axios');
 const placeOrder = async(req , res)=>{
     try {
 
-let defaultClient = UpstoxClient.ApiClient.instance;
+let defaultClient = new UpstoxClient.ApiClient();
 var OAUTH2 = defaultClient.authentications['OAUTH2'];
-OAUTH2.accessToken = access_token;
+OAUTH2.accessToken = req.session.brokerAccessToken;
 
-let apiInstance = new UpstoxClient.OrderApi();
+let apiInstance = new UpstoxClient.OrderApi(defaultClient);
 const {
     quantity ,
     product ,
@@ -26,10 +26,10 @@ let apiVersion = "2.0";
 
 apiInstance.placeOrder(body, apiVersion, (error, data, response) => {
   if (error) {
-      console.error(error.response.text);
+
       sendError(res , "placeOrder" ,error.response.text ,error.stack , 400 )
     } else {
-        console.log('API called successfully. Returned data: ' + data);
+
         sendSuccess(res , data)
   }
 });
@@ -40,10 +40,10 @@ apiInstance.placeOrder(body, apiVersion, (error, data, response) => {
 
 const getOrderBook = async(req , res)=>{
     try {
-let defaultClient = UpstoxClient.ApiClient.instance;
+let defaultClient = new UpstoxClient.ApiClient();
 var OAUTH2 = defaultClient.authentications['OAUTH2'];
-OAUTH2.accessToken = access_token;
-let apiInstance = new UpstoxClient.OrderApi();
+OAUTH2.accessToken = req.session.brokerAccessToken;
+let apiInstance = new UpstoxClient.OrderApi(defaultClient);
 
 let apiVersion = "2.0"; 
 
@@ -62,10 +62,10 @@ apiInstance.getOrderBook(apiVersion, (error, data, response) => {
 
 const modifyOrder = async(req , res)=>{
   try {
-    let defaultClient = UpstoxClient.ApiClient.instance;
+    let defaultClient = new UpstoxClient.ApiClient();
     var OAUTH2 = defaultClient.authentications['OAUTH2'];
-    OAUTH2.accessToken = access_token;
-    let apiInstance = new UpstoxClient.OrderApi();
+    OAUTH2.accessToken = req.session.brokerAccessToken;
+    let apiInstance = new UpstoxClient.OrderApi(defaultClient);
     const {
       quantity , 
       validity,
@@ -82,7 +82,7 @@ const modifyOrder = async(req , res)=>{
       if (error) {
         return sendError(res , "getOrderHistory" , error.text , error.stack)
       } else {
-        console.log('API called successfully. Returned data: ' + data);
+
         sendSuccess(res , data)
       }
     });
@@ -93,22 +93,22 @@ const modifyOrder = async(req , res)=>{
   }
 
 
-const cancelOrder = async()=>{
+const cancelOrder = async(req, res)=>{
     try {
-      let defaultClient = UpstoxClient.ApiClient.instance;
+      let defaultClient = new UpstoxClient.ApiClient();
       var OAUTH2 = defaultClient.authentications['OAUTH2'];
-      OAUTH2.accessToken = access_token;
-      let apiInstance = new UpstoxClient.OrderApi();
+      OAUTH2.accessToken = req.session.brokerAccessToken;
+      let apiInstance = new UpstoxClient.OrderApi(defaultClient);
       
       let orderId = req.body.orderId; 
       let apiVersion = "2.0"; 
       
       apiInstance.cancelOrder(orderId, apiVersion, (error, data, response) => {
         if (error) {
-          console.error(error);
+
           sendError(req ,cancelOrder , error , error.stack)
         } else {
-          console.log('API called successfully. Returned data: ' + data);
+
           sendSuccess(res , data)
         }
       });
@@ -117,14 +117,14 @@ const cancelOrder = async()=>{
     }
 }
 
-const getOrderHistory = async()=>{
+const getOrderHistory = async(req, res)=>{
    try {
     const axios = require('axios');
 
 const url = 'https://api.upstox.com/v2/order/details';
 const headers = {
   'Accept': 'application/json',
-  'Authorization': `Bearer ${access_token}`
+  'Authorization': `Bearer ${req.session.brokerAccessToken}`
 };
 
   order_id = req.params.order_id
@@ -146,10 +146,10 @@ axios.get(url, { headers, params })
 
 const getTradeHistory = (req , res) =>{
   try {
-let defaultClient = UpstoxClient.ApiClient.instance;
+let defaultClient = new UpstoxClient.ApiClient();
 var OAUTH2 = defaultClient.authentications['OAUTH2'];
-OAUTH2.accessToken = access_token;
-let apiInstance = new UpstoxClient.OrderApi();
+OAUTH2.accessToken = req.session.brokerAccessToken;
+let apiInstance = new UpstoxClient.OrderApi(defaultClient);
 
 let apiVersion = "2.0"; 
 
@@ -169,10 +169,10 @@ apiInstance.getTradeHistory(apiVersion, (error, data, response) => {
 const getTradesByOrder = (req, res) =>{
 try {
   let UpstoxClient = require('upstox-js-sdk');
-let defaultClient = UpstoxClient.ApiClient.instance;
+let defaultClient = new UpstoxClient.ApiClient();
 var OAUTH2 = defaultClient.authentications['OAUTH2'];
-OAUTH2.accessToken = access_token;
-let apiInstance = new UpstoxClient.OrderApi();
+OAUTH2.accessToken = req.session.brokerAccessToken;
+let apiInstance = new UpstoxClient.OrderApi(defaultClient);
 
 let orderId = req.query.params; 
 let apiVersion = "2.0"; 
@@ -182,7 +182,7 @@ apiInstance.getTradesByOrder(orderId, apiVersion, (error, data, response) => {
     sendError(res , "getTradesByOrder" , error.message , error.stack)
   } else {
     sendSuccess(res , response.data)
-    console.log('API called successfully. Returned data: ' + JSON.stringify(data));
+
   }
 });
 } catch (error) {
@@ -196,7 +196,7 @@ const historicalTrades = (req , res) =>{
 const url = 'https://api.upstox.com/v2/charges/historical-trades';
 const headers = {
   'Accept': 'application/json',
-  'Authorization': `Bearer ${access_token}`
+  'Authorization': `Bearer ${req.session.brokerAccessToken}`
 };
 
 

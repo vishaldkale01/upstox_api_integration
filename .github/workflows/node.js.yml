@@ -1,37 +1,19 @@
-name: Node.js CI
-
+name: Gateway checks
 on:
   push:
-    branches: ["master"]
   pull_request:
-    branches: ["master"]
-
+permissions:
+  contents: read
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
-    env:
-      MONGO_DB: ${{ secrets.MONGO_DB }}
-      port: ${{ secrets.port }}
-      UPSTOX_API_KEY: ${{ secrets.UPSTOX_API_KEY }}
-      UPSTOX_API_SECRET: ${{ secrets.UPSTOX_API_SECRET }}
-      UPSTOX_REDIRECT_URI: ${{ secrets.UPSTOX_REDIRECT_URI }}
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-
+          node-version: '22'
+          cache: npm
       - run: npm ci
-
-      - name: Run tests
-        run: npm test
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

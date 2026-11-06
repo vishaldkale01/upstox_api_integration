@@ -1,12 +1,5 @@
-// Common function for success response
-const sendSuccess = (res, data) => {
-    res.status(200).json({ status: 'success', data });
-  };
-  
-  // Common function for error response with function name
-  const sendError = (res, functionName, errorMessage, errorStack = "" , statusCode = 500) => {
-    const fullErrorMessage = `Error in ${functionName}: ${errorMessage} , ${errorStack  } `;
-    console.error(fullErrorMessage);
-    res.status(statusCode).json({ status: 'error', message: errorMessage });
-  };
-module.exports = {sendSuccess , sendError}  
+const sendSuccess = (res, data) => res.status(200).json({ status: 'success', data });
+// Legacy callers may pass sensitive SDK errors/stacks. Do not emit them.
+const sendError = (res, _functionName, _message, _stack = '', statusCode = 500) =>
+  res.status(statusCode).json({ status: 'error', message: 'Unable to complete broker request' });
+module.exports = { sendSuccess, sendError };

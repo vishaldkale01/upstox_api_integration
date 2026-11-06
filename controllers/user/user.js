@@ -1,10 +1,10 @@
 const getUserProfile = async (req , res)=>{
     try {
-        let defaultClient = UpstoxClient.ApiClient.instance;
+        let defaultClient = new UpstoxClient.ApiClient();
         let OAUTH2 = defaultClient.authentications['OAUTH2'];
-        OAUTH2.accessToken = access_token;
+        OAUTH2.accessToken = req.session.brokerAccessToken;
     
-        let apiInstance = new UpstoxClient.UserApi();
+        let apiInstance = new UpstoxClient.UserApi(defaultClient);
         let apiVersion = '2.0';
     
         apiInstance.getProfile(apiVersion, (error, data) => {
@@ -22,10 +22,11 @@ const getUserProfile = async (req , res)=>{
 
 const getUserProfileFundAndMargine =  async (req , res)=>{
     try {
+        let defaultClient = new UpstoxClient.ApiClient();
         let OAUTH2 = defaultClient.authentications['OAUTH2'];
-        OAUTH2.accessToken = access_token;
+        OAUTH2.accessToken = req.session.brokerAccessToken;
     
-        let apiInstance = new UpstoxClient.UserApi();
+        let apiInstance = new UpstoxClient.UserApi(defaultClient);
         let apiVersion = '2.0';
     
         apiInstance.getUserFundMargin(apiVersion, null, (error, data) => {
